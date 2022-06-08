@@ -27,9 +27,7 @@
 
 次の特徴はカテゴリーに分類される。
 `['B_30', 'B_38', 'D_114', 'D_116', 'D_117', 'D_120', 'D_126', 'D_63', 'D_64', 'D_66', 'D_68']`
-あなたの仕事はそれぞれの`customer_ID`について将来のデフォルトを`target=1`で 0 予測すること。
-
-> Note that the negative class has been subsampled for this dataset at 5%, and thus receives a 20x weighting in the scoring metric. <-わからん
+あなたの仕事はそれぞれの`customer_ID`について将来のデフォルトを`target=1`で予測すること。
 
 -   `train_data.csv` <font color="red"><b>(16.39GB)</b></font>顧客ごとの明細データを持つ学習データ
 -   `train_labels.csv` <font color="red">(30.75MB)</font>`customer_ID`ごとの`target`ラベル
