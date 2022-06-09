@@ -4,9 +4,11 @@ from pathlib import Path
 # third party
 import dask.dataframe as dd
 import pandas as pd
+import numpy as np
 from plotly import express as px
 from plotly import graph_objects as go
 # %%
+save_path = Path(r"..\Document\src")
 train_data_path = Path(r"Data\feather_data\train_data.ftr")
 train_labels_path = Path(r"Data\amex-default-prediction\train_labels.csv")
 # %%
@@ -33,12 +35,20 @@ fig = px.histogram(
     color="target"
 )
 fig.update_layout(barmode='overlay')
+# fig.update_yaxes(range=(0, 10000))
 fig.update_traces(opacity=0.80)
+fig.update_layout(
+    margin_l=10,
+    margin_b=10,
+    margin_t=30,
+    height=450,
+)
+fig.write_image(save_path / "target_histogram.svg")
 fig.show()
 # %%
 
 
-def multiplot(chart_title: str, data: pd.DataFrame, x_var: pd.Series):
+def multiplot(target: int, label: str, data: pd.DataFrame, x_var: pd.Series):
     ratio = 1
     obj_list = []
     stb_list = []
@@ -59,38 +69,36 @@ def multiplot(chart_title: str, data: pd.DataFrame, x_var: pd.Series):
         fig.add_trace(
             go.Scatter(x=x_var, y=data[item], name=item)
         )
-        fig.update_layout(
-            title=chart_title,
-            xaxis_title="Date",
-            yaxis_title="Normalized var",
-            margin_l=10,
-            margin_b=10,
-            margin_t=30,
-            height=450,
-        )
+    feat_num = len(data.columns[1:]) - len(obj_list) - len(stb_list)
+    fig.update_layout(
+        title=f"{label} target={target}, line={feat_num}",
+        xaxis_title="Date",
+        yaxis_title="Normalized var",
+        margin_l=10,
+        margin_b=10,
+        margin_t=30,
+        height=450,
+    )
     fig.show()
+    fig.write_image(save_path / f"transition_{label}_{target}.svg")
     print(f"{obj_list=}", f"{stb_list=}", sep="\n")
 
 
-def create_categorichart(data: pd.DataFrame, target: int):
-    for cols in (
-        [col for col in data.columns if col[0] == "D"],
-        [col for col in data.columns if col[0] == "S"],
-        [col for col in data.columns if col[0] == "P"],
-        [col for col in data.columns if col[0] == "B"],
-        [col for col in data.columns if col[0] == "R"]
+for target in train_labels["target"].unique():
+    id_df = train_unique.query(f"target=={target}")["customer_ID"]
+    cid = id_df.values[np.random.randint(0, len(id_df) + 1)]
+    vis_data = train_data.query(f"customer_ID=='{cid}'")
+    for feature, cols in (
+        ("Delinquency", [col for col in train_data.columns if col[0] == "D"]),
+        ("Spend", [col for col in train_data.columns if col[0] == "S"]),
+        ("Payment", [col for col in train_data.columns if col[0] == "P"]),
+        ("Balance", [col for col in train_data.columns if col[0] == "B"]),
+        ("Risk", [col for col in train_data.columns if col[0] == "R"])
     ):
         multiplot(
-            f"target={target}, line={len(cols)}",
-            data[cols],
-            data["S_2"]
+            target, feature,
+            vis_data[cols],
+            vis_data["S_2"]
         )
 
-
-cid = train_unique.query("target==0")["customer_ID"].values[0]
-train_personal = train_data.query(f"customer_ID=='{cid}'")
-create_categorichart(train_personal, 0)
-cid = train_unique.query("target==1")["customer_ID"].values[0]
-train_personal = train_data.query(f"customer_ID=='{cid}'")
-create_categorichart(train_personal, 1)
 # %%

@@ -3,6 +3,10 @@
 - [American Express - Default Prediction](#american-express---default-prediction)
   - [1. Abstract](#1-abstract)
   - [2. Data](#2-data)
+  - [3. feather 形式に変換](#3-feather-形式に変換)
+  - [4. データの概観](#4-データの概観)
+    - [4.1. 明細数の確認](#41-明細数の確認)
+    - [4.2. カテゴリ別に target を比較](#42-カテゴリ別に-target-を比較)
 
 ---
 
@@ -33,3 +37,93 @@
 -   `train_labels.csv` <font color="red">(30.75MB)</font>`customer_ID`ごとの`target`ラベル
 -   `test_data.csv` <font color="red"><b>(33.82GB)</b></font>テストデータ;`customer_ID`ごとに`target`を予測する
 -   `sample_submission.csv` <font color="red">(61.95MB)</font>正しい形式の提出サンプル
+
+## 3. feather 形式に変換
+
+[What is feather?](https://www.rstudio.com/blog/feather/)
+
+> Feather: A Fast On-Disk Format for Data Frames for R and Python, powered by Apache Arrow
+
+CSV データが重すぎて、このまま`read_csv`するとメモリが飛ぶ。そこで軽量な feather 形式に変換する。ついでに、データ型も換えておく。
+
+@import "..\Development\convert_to_feather.py"
+
+2 時間ぐらいかかった。
+
+-   `train_data.csv` (16.39GB) -> ftr:**1.67GB**
+-   `test_data.csv` (33.82GB) -> ftr:**3.44GB**
+
+`pandas`で`to_feather`するには以下のライブラリが必要
+
+```bash
+Package           Version
+----------------- -----------
+pandas            1.4.2
+pyarrow           8.0.0
+```
+
+## 4. データの概観
+
+### 4.1. 明細数の確認
+
+<div align= "center">
+
+<img src="src/target_histogram.svg" width=75%>
+
+`顧客単位の明細データ数`
+
+</div>
+
+<div align= "center">
+
+<img src="src/target_histogram_ex.svg" width=75%>
+
+`拡大`
+
+</div>
+
+### 4.2. カテゴリ別に target を比較
+
+<div class="block_all">
+<div class="block_left">
+
+<div align= "center">
+
+<img src="src/transition_Delinquency_0.svg">
+<img src="src/transition_Spend_0.svg">
+<img src="src/transition_Payment_0.svg">
+<img src="src/transition_Balance_0.svg">
+<img src="src/transition_Risk_0.svg">
+
+`破産しない`
+
+</div>
+
+</div>
+
+<div class="block_right">
+
+<div align= "center">
+
+<img src="src/transition_Delinquency_1.svg">
+<img src="src/transition_Spend_1.svg">
+<img src="src/transition_Payment_1.svg">
+<img src="src/transition_Balance_1.svg">
+<img src="src/transition_Risk_1.svg">
+
+`破産する`
+
+</div>
+
+</div>
+</div>
+
+<style>
+.block_all{width:800px;margin:0 auto;}
+</style>
+<style>
+.block_left{width:400px;float:left;}
+</style>
+<style>
+.block_right{width:400px;float:right;}
+</style>
