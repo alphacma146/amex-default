@@ -43,7 +43,7 @@ fig.update_layout(
     margin_t=30,
     height=450,
 )
-fig.write_image(save_path / "target_histogram.svg")
+# fig.write_image(save_path / "target_histogram.svg")
 fig.show()
 # %%
 
@@ -80,7 +80,7 @@ def multiplot(target: int, label: str, data: pd.DataFrame, x_var: pd.Series):
         height=450,
     )
     fig.show()
-    fig.write_image(save_path / f"transition_{label}_{target}.svg")
+    # fig.write_image(save_path / f"transition_{label}_{target}.svg")
     print(f"{obj_list=}", f"{stb_list=}", sep="\n")
 
 
