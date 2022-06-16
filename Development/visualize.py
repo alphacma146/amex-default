@@ -5,7 +5,7 @@ from pathlib import Path
 import dask.dataframe as dd
 import pandas as pd
 import numpy as np
-from plotly import express as px
+from plotly import express as px  # kaleido==0.1.0.post1 (win11)
 from plotly import graph_objects as go
 # %%
 save_path = Path(r"..\Document\src")
@@ -43,7 +43,7 @@ fig.update_layout(
     margin_t=30,
     height=450,
 )
-# fig.write_image(save_path / "target_histogram.svg")
+fig.write_image(save_path / "target_histogram.svg")
 fig.show()
 # %%
 
