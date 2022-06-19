@@ -7,6 +7,8 @@
   - [4. データの概観](#4-データの概観)
     - [4.1. 明細数の確認](#41-明細数の確認)
     - [4.2. カテゴリ別に target を比較](#42-カテゴリ別に-target-を比較)
+  - [LightGBM](#lightgbm)
+    - [GPU 版インストール手順](#gpu-版インストール手順)
 
 ---
 
@@ -48,7 +50,7 @@ CSV データが重すぎて、このまま`read_csv`するとメモリが飛ぶ
 
 @import "..\Development\convert_to_feather.py"
 
-2 時間ぐらいかかった。
+~~2 時間ぐらいかかった。~~
 
 -   `train_data.csv` (16.39GB) -> ftr:**1.67GB**
 -   `test_data.csv` (33.82GB) -> ftr:**3.44GB**
@@ -127,3 +129,24 @@ pyarrow           8.0.0
 <style>
 .block_right{width:400px;float:right;}
 </style>
+
+## LightGBM
+
+https://pypi.org/project/lightgbm/
+
+### GPU 版インストール手順
+
+1. `Cmake`のインストール
+   https://cmake.org/download/
+2. `OpenCL`をインストール
+   GPU のメーカーで分岐
+    - Intel SDK for OpenCL
+    - AMD APP SDK
+    - NVIDIA CUDA Toolkit
+      https://www.nvidia.co.jp/Download/index.aspx?lang=jp
+3. ~~`Boost`のインストール~~
+   https://sourceforge.net/projects/boost/postdownload
+   から exe を落としてインストール
+   警告がすごい出る
+
+この手順いらない？`"device":"gpu"`でいけたっぽい
