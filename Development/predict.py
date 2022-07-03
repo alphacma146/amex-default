@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 # Third party
 import numpy as np
 import pandas as pd
+import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
 from sklearn import metrics, model_selection
 from matplotlib import pyplot as plt
@@ -20,91 +21,117 @@ class Config():
     train_label_path: Path = Path(
         r"Data\amex-default-prediction\train_labels.csv"
     )
+    sample_submission_path: Path = Path(
+        r"Data\amex-default-prediction\sample_submission.csv"
+    )
     result_submission_path: Path = Path(r"Data\result_submission.csv")
     model_param: dict = field(default_factory=lambda: {
-        "task": "train",
-        "boosting": "gbdt",
+        "device": "gpu",
         "objective": "binary",
-        "metric": {"binary_logloss"},
-        'num_leaves': 13,
-        'min_data_in_leaf': 7,
-        'max_depth': -1,
-        "force_col_wise": True,
-        "device": "gpu"
+        "max_bin": 255,
+        "max_depth": -1,
+        "bagging_fraction": 0.7300867687463426,
+        "feature_fraction": 0.545038803605222,
     })
 
 
 CFG = Config()
-
+# {
+# 'device': 'gpu',
+# 'objective': 'binary',
+# 'max_bin': 255,
+# 'max_depth': -1,
+# 'bagging_fraction': 0.7300867687463426,
+# 'feature_fraction': 0.4,
+# 'feature_pre_filter': False,
+# 'lambda_l1': 0.955077643575833,
+# 'lambda_l2': 0.015870395502405488,
+# 'num_leaves': 256,
+# 'bagging_freq': 0,
+# 'min_child_samples': 100,
+# 'num_iterations': 300,
+# 'early_stopping_round': None
+# }
+# 0.9045206034775558
 
 # %%
 # 最新の明細で学習する
-train_data = pd.read_feather(CFG.train_data_path)
-train_label = pd.read_csv(CFG.train_label_path)
-train_data["date"] = pd.to_datetime(train_data["S_2"], format="%Y-%m-%d")
-latest_statement = (
-    train_data
-    .loc[
-        train_data
-        .groupby("customer_ID")["date"]
-        .idxmax()
+train_data = (
+    pd.read_feather(CFG.train_data_path)
+    .groupby('customer_ID')
+    .tail(2)
+    .set_index('customer_ID', drop=True)
+    .sort_index()
+)
+train_labels = (
+    pd.read_csv(CFG.train_label_path)
+    .set_index('customer_ID', drop=True)
+    .sort_index()
+)
+train_data = pd.merge(
+    train_data,
+    train_labels,
+    left_index=True,
+    right_index=True
+)
+# %%
+# パラメータチューニング
+start_time = time.time()
+remove = ["S_2", "D_63", "D_64"]
+
+train, valid = model_selection.train_test_split(
+    train_data.drop(remove, axis=1),
+    test_size=0.2,
+    random_state=0
+)
+train_set = lgb.Dataset(
+    train.drop("target", axis=1),
+    train["target"]
+)
+valid_set = lgb.Dataset(
+    valid.drop("target", axis=1),
+    valid["target"],
+    reference=train_set
+)
+
+param_search = opt_lgb.train(
+    CFG.model_param,
+    train_set=train_set,
+    valid_sets=valid_set,
+    num_boost_round=300,
+    callbacks=[
+        lgb.early_stopping(50),
+        lgb.log_evaluation(0),
     ]
 )
-latest_statement = pd.merge(
-    latest_statement,
-    train_label,
-    left_on="customer_ID",
-    right_on="customer_ID"
-)
-latest_statement[["customer_ID", "date", "target"]].head()
-# %%
-# 学習
-start_time = time.time()
-res_list = []
-remove = ["customer_ID", "S_2", "date", "D_63", "D_64"]
-for _ in range(30):
-    train, valid = model_selection.train_test_split(
-        latest_statement.drop(remove, axis=1), test_size=0.1
-    )
-    train_lgb = lgb.Dataset(
-        train.drop("target", axis=1),
-        train["target"]
-    )
-    valid_lgb = lgb.Dataset(
-        valid.drop("target", axis=1),
-        valid["target"]
-    )
-    model_lgb = lgb.train(
-        CFG.model_param,
-        train_lgb,
-        valid_sets=valid_lgb,
-        num_boost_round=10000,
-        callbacks=[
-            lgb.early_stopping(100),
-            lgb.log_evaluation(0),
-        ]
-    )
-    result = model_lgb.predict(valid.drop("target", axis=1))
-    score = metrics.accuracy_score(
-        valid["target"],
-        np.where(result < 0.5, 0, 1)
-    )
-    res_list.append((model_lgb, result, score))
-    print(score)
 end_time = time.time()
 # %%
-# output
-best_model, best_result, best_score = max(
-    res_list, key=lambda x: x[2]
+model = lgb.train(
+    CFG.model_param | param_search.params,
+    train_set=train_set,
+    valid_sets=valid_set,
+    num_boost_round=1000,
+    callbacks=[
+        lgb.early_stopping(100),
+        lgb.log_evaluation(0),
+    ]
 )
-sns.displot(best_result, bins=20, kde=True, rug=False)
+# %%
+result = model.predict(valid.drop("target", axis=1))
+score = metrics.accuracy_score(
+    valid["target"],
+    np.where(result < 0.5, 0, 1)
+)
+print(model.params, score, sep="\n")
+# %%
+# output
+sns.displot(result, bins=20, kde=True, rug=False)
 plt.show()
-lgb.plot_importance(best_model)
+lgb.plot_importance(model)
 plt.show()
-print(best_score)
 
 print(
-    f"{start_time-end_time:.3f}".ljust(7, "_")
+    f"{end_time-start_time:.3f}".ljust(7, "_")
     + f": {score:.3f}"
     + "[-]"
 )
@@ -119,15 +146,10 @@ test_data = (
         .groupby("customer_ID")["date"]
         .idxmax()
     ]
+    .set_index("customer_ID", drop=True)
 )
-result = pd.DataFrame(
-    data={
-        "prediction": np.where(
-            best_model.predict(test_data.drop(remove, axis=1)) < 0.5,
-            0, 1
-        )
-    },
-    index=test_data["customer_ID"]
-)
-result.to_csv(CFG.result_submission_path)
+
+sub = pd.read_csv(CFG.sample_submission_path)
+sub["prediction"] = model.predict(test_data.drop(["date", *remove], axis=1))
+sub.to_csv(CFG.result_submission_path, index=False)
 # %%
