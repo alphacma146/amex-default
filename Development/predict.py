@@ -30,8 +30,8 @@ class Config():
         "objective": "binary",
         "max_bin": 255,
         "max_depth": -1,
-        "bagging_fraction": 0.7300867687463426,
-        "feature_fraction": 0.545038803605222,
+        # "bagging_fraction": 0.7300867687463426,
+        "feature_fraction": 0.545038803605222
     })
 
 
@@ -41,18 +41,18 @@ CFG = Config()
 # 'objective': 'binary',
 # 'max_bin': 255,
 # 'max_depth': -1,
-# 'bagging_fraction': 0.7300867687463426,
 # 'feature_fraction': 0.4,
 # 'feature_pre_filter': False,
-# 'lambda_l1': 0.955077643575833,
-# 'lambda_l2': 0.015870395502405488,
-# 'num_leaves': 256,
+# 'lambda_l1': 0.38700098861246723,
+# 'lambda_l2': 0.270693422083792,
+# 'num_leaves': 253,
+# 'bagging_fraction': 1.0,
 # 'bagging_freq': 0,
 # 'min_child_samples': 100,
 # 'num_iterations': 300,
 # 'early_stopping_round': None
 # }
-# 0.9045206034775558
+# 0.9045479944341576
 
 # %%
 # 最新の明細で学習する
