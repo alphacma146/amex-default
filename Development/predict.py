@@ -13,6 +13,8 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 sns.set(style="darkgrid")
 
+PARAM_SEARCH = False
+
 
 @dataclass
 class Config():
@@ -94,20 +96,37 @@ valid_set = lgb.Dataset(
     reference=train_set
 )
 
-param_search = opt_lgb.train(
-    CFG.model_param,
-    train_set=train_set,
-    valid_sets=valid_set,
-    num_boost_round=300,
-    callbacks=[
-        lgb.early_stopping(50),
-        lgb.log_evaluation(0),
-    ]
-)
+match PARAM_SEARCH:
+    case True:
+        opt_model = opt_lgb.train(
+            CFG.model_param,
+            train_set=train_set,
+            valid_sets=valid_set,
+            num_boost_round=300,
+            callbacks=[
+                lgb.early_stopping(50),
+                lgb.log_evaluation(0),
+            ]
+        )
+        param = opt_model.params
+    case False:
+        param = {
+            'feature_fraction': 0.4,
+            'feature_pre_filter': False,
+            'lambda_l1': 0.38700098861246723,
+            'lambda_l2': 0.270693422083792,
+            'num_leaves': 253,
+            'bagging_fraction': 1.0,
+            'bagging_freq': 0,
+            'min_child_samples': 100,
+            'num_iterations': 300,
+        }
+
+
 end_time = time.time()
 # %%
 model = lgb.train(
-    CFG.model_param | param_search.params,
+    CFG.model_param | param,
     train_set=train_set,
     valid_sets=valid_set,
     num_boost_round=1000,
