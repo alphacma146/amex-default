@@ -1,5 +1,4 @@
 # Standard lib
-import gc
 from pathlib import Path
 from dataclasses import dataclass, field
 # Third party
@@ -20,13 +19,6 @@ class Config():
 
 
 CFG = Config()
-
-train_data = (
-    pd.read_feather(CFG.train_data_path)
-    .set_index("customer_ID", drop=True)
-    .drop(CFG.remove_param, axis=1)
-)
-train_label = pd.read_csv(CFG.train_label_path, index_col="customer_ID")
 
 
 def time_series(data: pd.DataFrame, save_path: Path):
@@ -52,10 +44,28 @@ def time_series(data: pd.DataFrame, save_path: Path):
         df = pd.concat([df, df_cid])
 
         del df_cid
-        gc.collect()
 
     df.reset_index(drop=True, inplace=True)
-    df.to_csv(save_path)
+    df.to_feather(save_path)
 
 
-time_series(train_data, CFG.train_data_path.parent / "train_time_series.ftr")
+if __name__ == "__main__":
+
+    #    train_data = (
+    #        pd.read_feather(CFG.train_data_path)
+    #        .set_index("customer_ID", drop=True)
+    #        .drop(CFG.remove_param, axis=1)
+    #    )
+    #    time_series(
+    #        train_data,
+    #        CFG.train_data_path.parent / "train_time_series.ftr"
+    #    )
+    test_data = (
+        pd.read_feather(CFG.test_data_path)
+        .set_index("customer_ID", drop=True)
+        .drop(CFG.remove_param, axis=1)
+    )
+    time_series(
+        test_data,
+        CFG.test_data_path.parent / "test_time_series.ftr"
+    )
