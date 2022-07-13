@@ -51,21 +51,21 @@ def time_series(data: pd.DataFrame, save_path: Path):
 
 if __name__ == "__main__":
 
-    #    train_data = (
-    #        pd.read_feather(CFG.train_data_path)
-    #        .set_index("customer_ID", drop=True)
-    #        .drop(CFG.remove_param, axis=1)
-    #    )
-    #    time_series(
-    #        train_data,
-    #        CFG.train_data_path.parent / "train_time_series.ftr"
-    #    )
-    test_data = (
-        pd.read_feather(CFG.test_data_path)
+    train_data = (
+        pd.read_feather(CFG.train_data_path)
         .set_index("customer_ID", drop=True)
         .drop(CFG.remove_param, axis=1)
     )
     time_series(
-        test_data,
-        CFG.test_data_path.parent / "test_time_series.ftr"
+        train_data,
+        CFG.train_data_path.parent / "train_time_series.ftr"
     )
+    # test_data = (
+    #    pd.read_feather(CFG.test_data_path)
+    #    .set_index("customer_ID", drop=True)
+    #    .drop(CFG.remove_param, axis=1)
+    # )
+    # time_series(
+    #    test_data,
+    #    CFG.test_data_path.parent / "test_time_series.ftr"
+    # )
