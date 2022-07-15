@@ -10,9 +10,12 @@ from plotly import express as px  # kaleido==0.1.0.post1 (win11)
 # from plotly import graph_objects as go
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+
+
 # %%
 save_path = Path(r"..\Document\src")
 train_data_path = Path(r"Data\feather_data\train_data.ftr")
+test_data_path = Path(r"Data\feather_data\test_data.ftr")
 train_labels_path = Path(r"Data\amex-default-prediction\train_labels.csv")
 # %%
 raw_data = dd.read_csv(Path(r"Data\amex-default-prediction\train_data.csv"))
@@ -51,6 +54,7 @@ fig.update_layout(
 # fig.write_image(save_path / "target_histogram.svg", scale=10)
 fig.show()
 # %%
+# 主成分分析
 
 
 def correlation_heatmap(data: pd.DataFrame, category) -> None:
@@ -73,25 +77,29 @@ def correlation_heatmap(data: pd.DataFrame, category) -> None:
         height=600,
     )
     fig.show()
-    fig.write_image(
-        save_path / f"correlation_matrix_{category}.svg", scale=10
-    )
+    # fig.write_image(
+    #    save_path / f"correlation_matrix_{category}.svg", scale=10
+    # )
 
 
-def principal_component_analysis(data: pd.DataFrame, category: str) -> None:
+def principal_component_analysis(
+        data: pd.DataFrame,
+        category: str
+) -> pd.DataFrame:
     ss = StandardScaler()
-    pca = PCA()
+    pca = PCA(svd_solver="full")
+    data = data.fillna(0)
 
     correlation_heatmap(data, category)
-    st_data = ss.fit_transform(data.fillna(0))
+    st_data = ss.fit_transform(data)
     pca.fit(st_data)
-    prop_var = np.cumsum(pca.explained_variance_ratio_)
+    contribution_ratio = np.cumsum(pca.explained_variance_ratio_)
 
-    fig = px.scatter(prop_var)
+    fig = px.line(contribution_ratio, markers=True)
     fig.update_layout(
         # template="plotly_dark",
         title={
-            "text": f"proportion of variance {category}",
+            "text": f"contribution ratio {category}",
             "font": {
                 "size": 22,
                 "color": "black"
@@ -102,9 +110,9 @@ def principal_component_analysis(data: pd.DataFrame, category: str) -> None:
         margin_b=15,
     )
     fig.show()
-    fig.write_image(
-        save_path / f"prop_var_{category}.svg", scale=10
-    )
+    # fig.write_image(
+    #    save_path / f"contribution_ratio_{category}.svg", scale=10
+    # )
 
 
 train_data = (
@@ -113,11 +121,10 @@ train_data = (
     .set_index("customer_ID")
 )
 col_items = train_data.columns
-for cat in ("R", "D", "S", "P", "B"):
+ret_dict = {}
+for cat in ("D", "S", "P", "B", "R"):
     data = train_data[[col for col in col_items if col[0] == cat]]
     principal_component_analysis(data, cat)
 
-    if cat == "R":
-        break
-
-# %%
+    """ if cat == "R":
+        break """
