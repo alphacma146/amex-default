@@ -17,16 +17,15 @@ save_path = Path(r"..\Document\src")
 train_data_path = Path(r"Data\feather_data\train_data.ftr")
 test_data_path = Path(r"Data\feather_data\test_data.ftr")
 train_labels_path = Path(r"Data\amex-default-prediction\train_labels.csv")
-# %%
-raw_data = dd.read_csv(Path(r"Data\amex-default-prediction\train_data.csv"))
-print(raw_data.info(), raw_data.size, sep="\n")
-raw_data.head()
-del raw_data
-gc.collect()
-# %%
+# raw_data = dd.read_csv(Path(r"Data\amex-default-prediction\train_data.csv"))
+# print(raw_data.info(), raw_data.size, sep="\n")
+# raw_data.head()
+# del raw_data
+# gc.collect()
 train_data = pd.read_feather(train_data_path)
 train_labels = pd.read_csv(train_labels_path)
 # %%
+# histogram statements
 train_unique = train_data.groupby(
     "customer_ID",
     as_index=False
@@ -53,6 +52,58 @@ fig.update_layout(
 )
 # fig.write_image(save_path / "target_histogram.svg", scale=10)
 fig.show()
+
+del train_unique
+# %%
+# time scale
+
+
+def vis_category_timeseries(data: pd.DataFrame, column: str):
+
+    fig = px.line(data, x="S_2", y=column, color="target")
+    fig.update_traces(opacity=0.80)
+    fig.update_layout(
+        title={
+            "text": col,
+            "font": {
+                "size": 22,
+                "color": "black"
+            },
+            "x": 0.5,
+            "y": 0.95,
+        },
+        margin_l=15,
+        margin_b=15,
+        margin_t=50,
+        height=450,
+        xaxis={"title": None},
+        yaxis={"title": None}
+    )
+    # fig.write_image(save_path / f"timescale_{column}.svg", scale=10)
+    fig.show()
+
+
+target_ids = pd.DataFrame(columns=["customer_ID", "target"])
+for target in (0, 1):
+    df = train_labels.query(f"target=={target}").sample(n=50)
+    target_ids = pd.concat([target_ids, df])
+
+train_timescale = train_data.merge(
+    target_ids.set_index("customer_ID", drop=True),
+    how="inner",
+    on="customer_ID"
+)
+
+ignore_cols = ["customer_ID", "S_2", "target"]
+for col in train_timescale.columns:
+    if col in ignore_cols:
+        continue
+
+    vis_category_timeseries(
+        train_timescale[ignore_cols + [col]], col
+    )
+
+del train_timescale
 # %%
 # 主成分分析
 
@@ -72,7 +123,7 @@ def correlation_heatmap(data: pd.DataFrame, category) -> None:
             "y": 0.95,
         },
         margin_l=5,
-        margin_b=15,
+        margin_b=10,
         width=700,
         height=600,
     )
@@ -115,16 +166,20 @@ def principal_component_analysis(
     # )
 
 
-train_data = (
+train_pca = (
     train_data
     .drop(["S_2", "D_63", "D_64"], axis=1)
     .set_index("customer_ID")
 )
-col_items = train_data.columns
+
+col_items = train_pca.columns
 ret_dict = {}
 for cat in ("D", "S", "P", "B", "R"):
-    data = train_data[[col for col in col_items if col[0] == cat]]
+    data = train_pca[[col for col in col_items if col[0] == cat]]
     principal_component_analysis(data, cat)
 
     """ if cat == "R":
         break """
+
+del train_pca
+# %%
