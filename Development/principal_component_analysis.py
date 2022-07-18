@@ -12,6 +12,19 @@ CATEGORY_LIST = ("D", "S", "P", "B", "R")
 
 train_data_path = Path(r"Data\feather_data\train_data.ftr")
 test_data_path = Path(r"Data\feather_data\test_data.ftr")
+cat_features = [
+    "B_30",
+    "B_38",
+    "D_114",
+    "D_116",
+    "D_117",
+    "D_120",
+    "D_126",
+    "D_63",
+    "D_64",
+    "D_66",
+    "D_68"
+]
 
 
 def principal_component_analysis(
@@ -34,9 +47,6 @@ def principal_component_analysis(
     for column in feature_data.columns:
         if feature_data[column].dtype == np.float64:
             feature_data[column] = feature_data[column].astype(np.float16)
-
-    # feature_data["customer_ID"] = data.index
-    # feature_data.reset_index(drop=True, inplace=True)
 
     """ if cat == "R":
         break """
