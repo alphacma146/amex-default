@@ -1,9 +1,9 @@
 # %%
 # standard lib
-import gc
+# import gc
 from pathlib import Path
 # third party
-import dask.dataframe as dd
+# import dask.dataframe as dd
 import pandas as pd
 import numpy as np
 from plotly import express as px  # kaleido==0.1.0.post1 (win11)
@@ -11,6 +11,8 @@ from plotly import express as px  # kaleido==0.1.0.post1 (win11)
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
+
+CREATE_PICTURE = True
 
 # %%
 save_path = Path(r"..\Document\src")
@@ -50,7 +52,8 @@ fig.update_layout(
     margin_t=30,
     height=450,
 )
-# fig.write_image(save_path / "target_histogram.svg", scale=10)
+if CREATE_PICTURE:
+    fig.write_image(save_path / "target_histogram.svg", scale=10)
 fig.show()
 
 del train_unique
@@ -60,7 +63,13 @@ del train_unique
 
 def vis_category_timeseries(data: pd.DataFrame, column: str):
 
-    fig = px.line(data, x="S_2", y=column, color="target")
+    fig = px.line(
+        data,
+        line_group="customer_ID",
+        x="S_2",
+        y=column,
+        color="target"
+    )
     fig.update_traces(opacity=0.80)
     fig.update_layout(
         title={
@@ -79,13 +88,14 @@ def vis_category_timeseries(data: pd.DataFrame, column: str):
         xaxis={"title": None},
         yaxis={"title": None}
     )
-    # fig.write_image(save_path / f"timescale_{column}.svg", scale=10)
+    if CREATE_PICTURE:
+        fig.write_image(save_path / f"timescale_{column}.svg", scale=10)
     fig.show()
 
 
 target_ids = pd.DataFrame(columns=["customer_ID", "target"])
 for target in (0, 1):
-    df = train_labels.query(f"target=={target}").sample(n=50)
+    df = train_labels.query(f"target=={target}").sample(n=100)
     target_ids = pd.concat([target_ids, df])
 
 train_timescale = train_data.merge(
@@ -127,10 +137,11 @@ def correlation_heatmap(data: pd.DataFrame, category) -> None:
         width=700,
         height=600,
     )
+    if CREATE_PICTURE:
+        fig.write_image(
+            save_path / f"correlation_matrix_{category}.svg", scale=10
+        )
     fig.show()
-    # fig.write_image(
-    #    save_path / f"correlation_matrix_{category}.svg", scale=10
-    # )
 
 
 def principal_component_analysis(
@@ -160,10 +171,11 @@ def principal_component_analysis(
         },
         margin_b=15,
     )
+    if CREATE_PICTURE:
+        fig.write_image(
+            save_path / f"contribution_ratio_{category}.svg", scale=10
+        )
     fig.show()
-    # fig.write_image(
-    #    save_path / f"contribution_ratio_{category}.svg", scale=10
-    # )
 
 
 train_pca = (

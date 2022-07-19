@@ -7,6 +7,13 @@
   - [4. データの概観](#4-データの概観)
     - [4.1. 明細数の確認](#41-明細数の確認)
     - [4.2. カテゴリ別に target を比較](#42-カテゴリ別に-target-を比較)
+    - [4.3. パラメーター毎に target で比較](#43-パラメーター毎に-target-で比較)
+      - [Delinquency variables](#delinquency-variables)
+      - [Spend variables](#spend-variables)
+      - [Payment variables](#payment-variables)
+      - [Balance variables](#balance-variables)
+      - [Risk variables](#risk-variables)
+      - [パラメーターの分類](#パラメーターの分類)
   - [LightGBM](#lightgbm)
     - [GPU 版インストール手順](#gpu-版インストール手順)
 
@@ -68,6 +75,8 @@ pyarrow           8.0.0
 
 ### 4.1. 明細数の確認
 
+`train_data`の`customer_ID`毎に明細数をヒストグラム表示する。
+
 <div align= "center">
 
 <img src="src/target_histogram.svg" width=75%>
@@ -85,6 +94,8 @@ pyarrow           8.0.0
 </div>
 
 ### 4.2. カテゴリ別に target を比較
+
+`target`が`0`か`1`のそれぞれでランダムに 1 サンプルとり、パラメーターカテゴリー毎にプロットして比較する。
 
 <div class="block_all">
 <div class="block_left">
@@ -120,6 +131,290 @@ pyarrow           8.0.0
 </div>
 </div>
 
+### 4.3. パラメーター毎に target で比較
+
+`target`が`0`と`1`でそれぞれ 100 件分の`customer_ID`をサンプリングし、その明細データを各カテゴリー毎に比較する。
+
+#### Delinquency variables
+
+<div class="block_all">
+<div class="block_left">
+
+<div align= "center">
+
+<img src="src/timescale_D_39.svg">
+<img src="src/timescale_D_42.svg">
+<img src="src/timescale_D_44.svg">
+<img src="src/timescale_D_46.svg">
+<img src="src/timescale_D_48.svg">
+<img src="src/timescale_D_50.svg">
+<img src="src/timescale_D_52.svg">
+<img src="src/timescale_D_54.svg">
+<img src="src/timescale_D_56.svg">
+<img src="src/timescale_D_59.svg">
+<img src="src/timescale_D_61.svg">
+<img src="src/timescale_D_63.svg">
+<img src="src/timescale_D_65.svg">
+<img src="src/timescale_D_68.svg">
+<img src="src/timescale_D_70.svg">
+<img src="src/timescale_D_72.svg">
+<img src="src/timescale_D_74.svg">
+<img src="src/timescale_D_76.svg">
+<img src="src/timescale_D_78.svg">
+<img src="src/timescale_D_80.svg">
+<img src="src/timescale_D_82.svg">
+<img src="src/timescale_D_84.svg">
+<img src="src/timescale_D_87.svg">
+<img src="src/timescale_D_89.svg">
+<img src="src/timescale_D_92.svg">
+<img src="src/timescale_D_94.svg">
+<img src="src/timescale_D_102.svg">
+<img src="src/timescale_D_104.svg">
+<img src="src/timescale_D_106.svg">
+<img src="src/timescale_D_108.svg">
+<img src="src/timescale_D_110.svg">
+<img src="src/timescale_D_112.svg">
+<img src="src/timescale_D_114.svg">
+<img src="src/timescale_D_116.svg">
+<img src="src/timescale_D_118.svg">
+<img src="src/timescale_D_120.svg">
+<img src="src/timescale_D_122.svg">
+<img src="src/timescale_D_124.svg">
+<img src="src/timescale_D_126.svg">
+<img src="src/timescale_D_128.svg">
+<img src="src/timescale_D_130.svg">
+<img src="src/timescale_D_132.svg">
+<img src="src/timescale_D_134.svg">
+<img src="src/timescale_D_136.svg">
+<img src="src/timescale_D_138.svg">
+<img src="src/timescale_D_140.svg">
+<img src="src/timescale_D_142.svg">
+<img src="src/timescale_D_144.svg">
+</div>
+</div>
+
+<div class="block_right">
+
+<div align= "center">
+
+<img src="src/timescale_D_41.svg">
+<img src="src/timescale_D_43.svg">
+<img src="src/timescale_D_45.svg">
+<img src="src/timescale_D_47.svg">
+<img src="src/timescale_D_49.svg">
+<img src="src/timescale_D_51.svg">
+<img src="src/timescale_D_53.svg">
+<img src="src/timescale_D_55.svg">
+<img src="src/timescale_D_58.svg">
+<img src="src/timescale_D_60.svg">
+<img src="src/timescale_D_62.svg">
+<img src="src/timescale_D_64.svg">
+<img src="src/timescale_D_66.svg">
+<img src="src/timescale_D_69.svg">
+<img src="src/timescale_D_71.svg">
+<img src="src/timescale_D_73.svg">
+<img src="src/timescale_D_75.svg">
+<img src="src/timescale_D_77.svg">
+<img src="src/timescale_D_79.svg">
+<img src="src/timescale_D_81.svg">
+<img src="src/timescale_D_83.svg">
+<img src="src/timescale_D_86.svg">
+<img src="src/timescale_D_88.svg">
+<img src="src/timescale_D_91.svg">
+<img src="src/timescale_D_93.svg">
+<img src="src/timescale_D_96.svg">
+<img src="src/timescale_D_103.svg">
+<img src="src/timescale_D_105.svg">
+<img src="src/timescale_D_107.svg">
+<img src="src/timescale_D_109.svg">
+<img src="src/timescale_D_111.svg">
+<img src="src/timescale_D_113.svg">
+<img src="src/timescale_D_115.svg">
+<img src="src/timescale_D_117.svg">
+<img src="src/timescale_D_119.svg">
+<img src="src/timescale_D_121.svg">
+<img src="src/timescale_D_123.svg">
+<img src="src/timescale_D_125.svg">
+<img src="src/timescale_D_127.svg">
+<img src="src/timescale_D_129.svg">
+<img src="src/timescale_D_131.svg">
+<img src="src/timescale_D_133.svg">
+<img src="src/timescale_D_135.svg">
+<img src="src/timescale_D_137.svg">
+<img src="src/timescale_D_139.svg">
+<img src="src/timescale_D_141.svg">
+<img src="src/timescale_D_143.svg">
+<img src="src/timescale_D_145.svg">
+
+</div>
+
+</div>
+</div>
+
+#### Spend variables
+
+<div class="block_all">
+<div class="block_left">
+
+<div align= "center">
+
+<img src="src/timescale_S_3.svg">
+<img src="src/timescale_S_6.svg">
+<img src="src/timescale_S_9.svg">
+<img src="src/timescale_S_12.svg">
+<img src="src/timescale_S_15.svg">
+<img src="src/timescale_S_17.svg">
+<img src="src/timescale_S_19.svg">
+<img src="src/timescale_S_22.svg">
+<img src="src/timescale_S_24.svg">
+<img src="src/timescale_S_26.svg">
+
+</div>
+
+</div>
+
+<div class="block_right">
+
+<div align= "center">
+
+<img src="src/timescale_S_5.svg">
+<img src="src/timescale_S_7.svg">
+<img src="src/timescale_S_11.svg">
+<img src="src/timescale_S_13.svg">
+<img src="src/timescale_S_16.svg">
+<img src="src/timescale_S_18.svg">
+<img src="src/timescale_S_20.svg">
+<img src="src/timescale_S_23.svg">
+<img src="src/timescale_S_25.svg">
+<img src="src/timescale_S_27.svg">
+
+</div>
+
+</div>
+</div>
+
+#### Payment variables
+
+<div align= "center">
+
+<img src="src/timescale_P_2.svg">
+<img src="src/timescale_P_3.svg">
+<img src="src/timescale_P_4.svg">
+
+</div>
+
+#### Balance variables
+
+<div class="block_all">
+<div class="block_left">
+
+<div align= "center">
+
+<img src="src/timescale_B_1.svg">
+<img src="src/timescale_B_3.svg">
+<img src="src/timescale_B_5.svg">
+<img src="src/timescale_B_7.svg">
+<img src="src/timescale_B_9.svg">
+<img src="src/timescale_B_11.svg">
+<img src="src/timescale_B_13.svg">
+<img src="src/timescale_B_15.svg">
+<img src="src/timescale_B_17.svg">
+<img src="src/timescale_B_19.svg">
+<img src="src/timescale_B_21.svg">
+<img src="src/timescale_B_23.svg">
+<img src="src/timescale_B_25.svg">
+<img src="src/timescale_B_27.svg">
+<img src="src/timescale_B_29.svg">
+<img src="src/timescale_B_31.svg">
+<img src="src/timescale_B_33.svg">
+<img src="src/timescale_B_37.svg">
+<img src="src/timescale_B_39.svg">
+<img src="src/timescale_B_41.svg">
+
+</div>
+
+</div>
+
+<div class="block_right">
+
+<div align= "center">
+
+<img src="src/timescale_B_2.svg">
+<img src="src/timescale_B_4.svg">
+<img src="src/timescale_B_6.svg">
+<img src="src/timescale_B_8.svg">
+<img src="src/timescale_B_10.svg">
+<img src="src/timescale_B_12.svg">
+<img src="src/timescale_B_14.svg">
+<img src="src/timescale_B_16.svg">
+<img src="src/timescale_B_18.svg">
+<img src="src/timescale_B_20.svg">
+<img src="src/timescale_B_22.svg">
+<img src="src/timescale_B_24.svg">
+<img src="src/timescale_B_26.svg">
+<img src="src/timescale_B_28.svg">
+<img src="src/timescale_B_30.svg">
+<img src="src/timescale_B_32.svg">
+<img src="src/timescale_B_36.svg">
+<img src="src/timescale_B_38.svg">
+<img src="src/timescale_B_40.svg">
+<img src="src/timescale_B_42.svg">
+
+</div>
+
+</div>
+</div>
+
+#### Risk variables
+
+<div class="block_all">
+<div class="block_left">
+
+<div align= "center">
+
+<img src="src/timescale_R_1.svg">
+<img src="src/timescale_R_3.svg">
+<img src="src/timescale_R_5.svg">
+<img src="src/timescale_R_7.svg">
+<img src="src/timescale_R_9.svg">
+<img src="src/timescale_R_11.svg">
+<img src="src/timescale_R_13.svg">
+<img src="src/timescale_R_15.svg">
+<img src="src/timescale_R_17.svg">
+<img src="src/timescale_R_19.svg">
+<img src="src/timescale_R_21.svg">
+<img src="src/timescale_R_23.svg">
+<img src="src/timescale_R_25.svg">
+<img src="src/timescale_R_27.svg">
+
+</div>
+
+</div>
+
+<div class="block_right">
+
+<div align= "center">
+
+<img src="src/timescale_R_2.svg">
+<img src="src/timescale_R_4.svg">
+<img src="src/timescale_R_6.svg">
+<img src="src/timescale_R_8.svg">
+<img src="src/timescale_R_10.svg">
+<img src="src/timescale_R_12.svg">
+<img src="src/timescale_R_14.svg">
+<img src="src/timescale_R_16.svg">
+<img src="src/timescale_R_18.svg">
+<img src="src/timescale_R_20.svg">
+<img src="src/timescale_R_22.svg">
+<img src="src/timescale_R_24.svg">
+<img src="src/timescale_R_26.svg">
+<img src="src/timescale_R_28.svg">
+
+</div>
+
+</div>
+</div>
+
 <style>
 .block_all{width:800px;margin:0 auto;}
 </style>
@@ -129,6 +424,47 @@ pyarrow           8.0.0
 <style>
 .block_right{width:400px;float:right;}
 </style>
+
+#### パラメーターの分類
+
+-   カテゴリーデータ
+
+    -   名義尺度
+
+    ```
+    ['D_63', 'D_64', (S_2)] S_2 は日付
+    ```
+
+    -   間隔尺度
+
+    ```
+    ['B_30', 'B_38', 'D_114', 'D_116', 'D_117', 'D_120', 'D_126', 'D_66', 'D_68']
+    ```
+
+-   量的データ
+
+    -   二値っぽいもの
+
+    ```
+    ['D_54', 'D_82', 'D_86', 'D_93', 'D_94', 'D_96', 'D_103', 'D_112',
+    'D_123', 'D_127', 'D_128', 'D_129', 'D_130', 'D_140',
+    'S_6', 'S_18', 'S_20',
+    'B_8', 'B_31', 'B_32', 'B_33', 'B_41',
+    'R_2', 'R_4', 'R_15', 'R_19', 'R_21', 'R_22', 'R_24', 'R_25', 'R_27']
+    ```
+
+    -   三値以上っぽいもの
+
+    ```
+    ['D_91', 'D_92', 'D_113', 'D_125', 'B_22']
+    ```
+
+-   使えなさそうなデータ
+    ```
+    ['D_66', 'D_69', 'D_73', 'D_87', 'D_88', 'D_108',
+    'D_110', 'D_111', 'D_116', 'D_137', 'D_139', 'D_143',
+    'B_39', 'B_42', 'R_28']
+    ```
 
 ## LightGBM
 
