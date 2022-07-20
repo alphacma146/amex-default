@@ -13,8 +13,8 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 sns.set(style="darkgrid")
 
-DATA_TYPE = "pca"  # pca or normal
-PARAM_SEARCH = True
+DATA_TYPE = "normal"  # pca or normal
+PARAM_SEARCH = False
 
 
 @dataclass
@@ -38,9 +38,22 @@ class Config():
         # "bagging_fraction": 0.7300867687463426,
         # "feature_fraction": 0.545038803605222
     })
-    remove_parameter: list = field(default_factory=lambda: [
-        "S_2", "D_63", "D_64"
-    ])
+    remove_parameter: list = field(
+        default_factory=lambda: [
+            'S_2',
+            'D_63',
+            'D_64',
+            'B_30',
+            'B_38',
+            'D_114',
+            'D_116',
+            'D_117',
+            'D_120',
+            'D_126',
+            'D_66',
+            'D_68'
+        ]
+    )
 
 
 CFG = Config()
@@ -101,7 +114,7 @@ match DATA_TYPE:
 train_data = (
     pd.read_feather(train_path)
     .groupby('customer_ID')
-    .tail(2)
+    .tail(3)
     .set_index('customer_ID', drop=True)
     .sort_index()
     .drop(remove_list, axis=1)

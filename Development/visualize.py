@@ -74,10 +74,7 @@ def vis_category_timeseries(data: pd.DataFrame, column: str):
     fig.update_layout(
         title={
             "text": col,
-            "font": {
-                "size": 22,
-                "color": "black"
-            },
+            "font": {"size": 22, "color": "black"},
             "x": 0.5,
             "y": 0.95,
         },
@@ -125,10 +122,7 @@ def correlation_heatmap(data: pd.DataFrame, category) -> None:
         # template="plotly_dark",
         title={
             "text": f"parameter category {category}",
-            "font": {
-                "size": 22,
-                "color": "black"
-            },
+            "font": {"size": 22, "color": "black"},
             "x": 0.5,
             "y": 0.95,
         },
@@ -162,10 +156,7 @@ def principal_component_analysis(
         # template="plotly_dark",
         title={
             "text": f"contribution ratio {category}",
-            "font": {
-                "size": 22,
-                "color": "black"
-            },
+            "font": {"size": 22, "color": "black"},
             "x": 0.5,
             "y": 0.95,
         },
