@@ -14,12 +14,18 @@ def create_feather(input_path: Path, save_path: Path):
     df = pd.DataFrame()
     with pd.read_csv(input_path, chunksize=10000) as reader:
         for chunk in tqdm(reader):
-            for column in chunk.columns:
-                data_type = chunk[column].dtype
-                if data_type == np.float64:
-                    chunk[column] = chunk[column].astype(np.float16)
-                elif data_type == np.int64:
-                    chunk[column] = chunk[column].astype(np.int8)
+            for col in chunk.columns:
+                data_type = chunk[col].dtype
+                match data_type:
+                    case np.float64:
+                        dty = np.float16
+                    case np.int64:
+                        dty = np.int8
+                    case _:
+                        dty = "object"
+
+                chunk[col] = chunk[col].astype(dty)
+
             df = pd.concat([df, chunk])
 
             gc.collect()
