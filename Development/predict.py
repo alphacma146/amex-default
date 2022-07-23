@@ -1,6 +1,5 @@
 # %%
-# Standard lib
-import time
+# Standard libe
 from pathlib import Path
 from dataclasses import dataclass, field
 # Third party
@@ -10,19 +9,15 @@ import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
 from sklearn import model_selection
 from matplotlib import pyplot as plt
-import seaborn as sns
-sns.set(style="darkgrid")
+import plotly.express as px
 
-DATA_TYPE = "normal"  # pca or normal
-PARAM_SEARCH = False
+PARAM_SEARCH = True
 
 
 @dataclass
 class Config():
     train_data_path: Path = Path(r"Data\feather_data\train_data.ftr")
     test_data_path: Path = Path(r"Data\feather_data\test_data.ftr")
-    train_pca_data_path: Path = Path(r"Data\feather_data\train_pca_data.ftr")
-    test_pca_data_path: Path = Path(r"Data\feather_data\test_pca_data.ftr")
     train_label_path: Path = Path(
         r"Data\amex-default-prediction\train_labels.csv"
     )
@@ -33,25 +28,24 @@ class Config():
     model_param: dict = field(default_factory=lambda: {
         "device": "gpu",
         "objective": "binary",
-        "max_bin": 255,
+        "boosting": "dart",
+        "max_bin": 250,
         "max_depth": -1,
-        # "bagging_fraction": 0.7300867687463426,
-        # "feature_fraction": 0.545038803605222
+        "learning_rate": 0.05,
+        'feature_fraction': 0.4,
+        'bagging_fraction': 1.0,
     })
-    remove_parameter: list = field(
+    category_param: list = field(
         default_factory=lambda: [
-            'S_2',
-            'D_63',
-            'D_64',
-            'B_30',
-            'B_38',
-            'D_114',
-            'D_116',
-            'D_117',
-            'D_120',
-            'D_126',
-            'D_66',
-            'D_68'
+            'D_63', 'D_64',  # categorical
+            'B_30', 'B_38',
+            'D_114', 'D_116', 'D_117', 'D_120', 'D_126', 'D_66', 'D_68'
+        ]
+    )
+    remove_param: list = field(
+        default_factory=lambda: [
+            "S_2",
+            "D_73", "B_29", "D_87", "D_88", "D_110", "D_111", "B_39", "B_42"
         ]
     )
 
@@ -100,54 +94,57 @@ def lgb_amex_metric(y_pred, y_true):
 
 
 # %%
-# 最新の明細で学習する
-match DATA_TYPE:
-    case "normal":
-        train_path = CFG.train_data_path
-        test_path = CFG.test_data_path
-        remove_list = CFG.remove_parameter
-    case "pca":
-        train_path = CFG.train_pca_data_path
-        test_path = CFG.test_pca_data_path
-        remove_list = []
 
-train_data = (
-    pd.read_feather(train_path)
-    .groupby('customer_ID')
-    .tail(3)
-    .set_index('customer_ID', drop=True)
-    .sort_index()
-    .drop(remove_list, axis=1)
-)
+def preprocess(data: pd.DataFrame):
+    data.sort_values(["customer_ID", "S_2"], inplace=True)
+
+    if len(set(CFG.remove_param) & set(data.columns)) != 0:
+        data.drop(CFG.remove_param, axis=1, inplace=True)
+
+    cat_data = data[["customer_ID"] + CFG.category_param]
+    num_data = data[
+        [col for col in data.columns if col not in CFG.category_param]
+    ]
+    num_data = (
+        num_data
+        .groupby("customer_ID")
+        .agg(["mean", "std", "min", "max", "last"])
+    )
+    num_data.columns = ["_".join(col_list) for col_list in num_data.columns]
+    cat_data = (
+        pd.get_dummies(cat_data, columns=CFG.category_param)
+        .groupby("customer_ID")
+        .agg(["sum", "last"])
+    )
+    cat_data.columns = ["_".join(col_list) for col_list in cat_data.columns]
+    cat_data.drop(
+        [col for col in ['D_68_0.0_sum', 'D_68_0.0_last',
+                         'D_64_-1_sum', 'D_64_-1_last',
+                         'D_66_0.0_sum', 'D_66_0.0_last']
+         if col in cat_data.columns],
+        axis=1,
+        inplace=True
+    )
+
+    return pd.merge(num_data, cat_data, left_index=True, right_index=True)
+
+
+train_data = preprocess(pd.read_feather(CFG.train_data_path))
 train_labels = (
     pd.read_csv(CFG.train_label_path)
     .set_index('customer_ID', drop=True)
     .sort_index()
 )
-train_data = pd.merge(
-    train_data,
-    train_labels,
-    left_index=True,
-    right_index=True
-)
 # %%
 # パラメータチューニング
-start_time = time.time()
-
-train, valid = model_selection.train_test_split(
+x_train, x_valid, y_train, y_valid = model_selection.train_test_split(
     train_data,
-    test_size=0.2,
+    train_labels["target"],
+    test_size=0.25,
     random_state=0
 )
-train_set = lgb.Dataset(
-    train.drop("target", axis=1),
-    train["target"]
-)
-valid_set = lgb.Dataset(
-    valid.drop("target", axis=1),
-    valid["target"],
-    reference=train_set
-)
+train_set = lgb.Dataset(x_train, y_train)
+valid_set = lgb.Dataset(x_valid, y_valid, reference=train_set)
 
 match PARAM_SEARCH:
     case True:
@@ -164,39 +161,21 @@ match PARAM_SEARCH:
         )
         param = opt_model.params
     case False:
-        match DATA_TYPE:
-            case "normal":
-                param = {
-                    'feature_pre_filter': False,
-                    'lambda_l1': 0.3916093444694036,
-                    'lambda_l2': 0.010040374004305474,
-                    'num_leaves': 241,
-                    'feature_fraction': 0.4,
-                    'bagging_fraction': 1.0,
-                    'bagging_freq': 0,
-                    'min_child_samples': 10,
-                    'num_iterations': 500,
-                }
-                # 0.7930567263600699
-            case "pca":
-                param = {
-                    'feature_fraction': 0.748,
-                    'feature_pre_filter': False,
-                    'lambda_l1': 1.8813865762117634,
-                    'lambda_l2': 1.9355417225259987e-05,
-                    'num_leaves': 256,
-                    'bagging_fraction': 1.0,
-                    'bagging_freq': 0,
-                    'min_child_samples': 20,
-                    'num_iterations': 300,
-                    # 0.8994916238454712
-                }
-
-
-end_time = time.time()
+        param = {
+            'feature_pre_filter': False,
+            'lambda_l1': 0.3916093444694036,
+            'lambda_l2': 0.010040374004305474,
+            'num_leaves': 241,
+            'feature_fraction': 0.4,
+            'bagging_fraction': 1.0,
+            'bagging_freq': 0,
+            'min_child_samples': 10,
+            'num_iterations': 500,
+        }
+        # 0.7930567263600699
 # %%
 model = lgb.train(
-    CFG.model_param | param,
+    CFG.model_param,
     train_set=train_set,
     valid_sets=valid_set,
     feval=lgb_amex_metric,
@@ -207,33 +186,23 @@ model = lgb.train(
     ]
 )
 # %%
-result = model.predict(valid.drop("target", axis=1))
-score = amex_metric(valid["target"], result)
+result = model.predict(x_valid)
+score = amex_metric(y_valid, result)
 print(model.params, score, sep="\n")
-# %%
-# output
-sns.displot(result, bins=20, kde=True, rug=False)
-plt.show()
+fig = px.histogram(result, nbins=100)
+fig.show()
 lgb.plot_importance(model)
 plt.show()
-
-print(
-    f"{end_time-start_time:.3f}".ljust(7, "_")
-    + f": {score:.3f}"
-    + "[-]"
-)
 # %%
 # predict
-test_data = (
-    pd.read_feather(test_path)
-    .groupby('customer_ID')
-    .tail(1)
-    .set_index('customer_ID', drop=True)
-    .sort_index()
-    .drop(remove_list, axis=1)
+test_data = preprocess(pd.read_feather(CFG.test_data_path))
+# %%
+res_df = pd.DataFrame(
+    data={"prediction": model.predict(test_data)},
+    index=test_data.index
 )
-
-sub = pd.read_csv(CFG.sample_submission_path)
-sub["prediction"] = model.predict(test_data)
-sub.to_csv(CFG.result_submission_path, index=False)
+sub_df = pd.read_csv(CFG.sample_submission_path, usecols=["customer_ID"])
+sub_df = sub_df.merge(res_df, left_on="customer_ID", right_index=True)
+print(sub_df.head(10))
+sub_df.to_csv(CFG.result_submission_path, index=False)
 # %%
