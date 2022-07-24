@@ -11,7 +11,7 @@ from sklearn import model_selection
 from sklearn.model_selection import KFold
 import plotly.express as px
 
-PARAM_SEARCH = True
+PARAM_SEARCH = False
 
 
 @dataclass
@@ -157,8 +157,8 @@ def show_result(model, x_value, y_value):
     fig.show()
     importance = pd.DataFrame(
         data={
-            "importance": model.feature_importance(),
-            "col": train_data.columns
+            "col": x_value.columns,
+            "importance": model.feature_importance()
         }
     ).sort_values(["importance"])
     fig = px.bar(importance["importance"])
@@ -190,7 +190,7 @@ res_df["ratio"] = (
     / res_df["importance"].sum()
     * 100
 )
-use_col = res_df.query("ratio>=0.1")["col"]
+use_col = res_df.query("ratio>=0.05")["col"]
 print(use_col)
 # %%
 (
@@ -217,15 +217,17 @@ match PARAM_SEARCH:
     case False:
         param = {
             'feature_pre_filter': False,
-            'lambda_l1': 0.3916093444694036,
-            'lambda_l2': 0.010040374004305474,
-            'num_leaves': 241,
-            'feature_fraction': 0.4,
-            'bagging_fraction': 1.0,
-            'bagging_freq': 0,
-            'min_child_samples': 10
+            'lambda_l1': 0.583389841517446,
+            'lambda_l2': 5.880437992520181,
+            'num_leaves': 214,
+            'feature_fraction': 1.0,
+            'bagging_fraction': 0.6810221344608107,
+            'bagging_freq': 1,
+            'min_child_samples': 50,
+            'num_iterations': 1000
         }
-        # 0.7930567263600699
+        # .7852266832010086
+
 # %%
 model = lgb.train(
     CFG.model_param | param,
