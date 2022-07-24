@@ -14,8 +14,22 @@
       - [Balance variables](#balance-variables)
       - [Risk variables](#risk-variables)
       - [パラメーターの分類](#パラメーターの分類)
-  - [LightGBM](#lightgbm)
+    - [4.4. 相関行列と寄与率](#44-相関行列と寄与率)
+      - [Delinquency variables](#delinquency-variables-1)
+      - [Spend variables](#spend-variables-1)
+      - [Payment variables](#payment-variables-1)
+      - [Balance variables](#balance-variables-1)
+      - [Risk variables](#risk-variables-1)
+  - [5.1. LightGBM](#51-lightgbm)
     - [GPU 版インストール手順](#gpu-版インストール手順)
+    - [dart](#dart)
+    - [評価関数](#評価関数)
+  - [6.1. 結果](#61-結果)
+    - [顧客毎に最新の 2 明細で学習](#顧客毎に最新の-2-明細で学習)
+    - [ハイパーパラメータチューニング](#ハイパーパラメータチューニング)
+    - [主成分分析でパラメータを圧縮](#主成分分析でパラメータを圧縮)
+    - [パラメータ毎に統計量を算出、カテゴリーパラメータは one-hot-encoding](#パラメータ毎に統計量を算出カテゴリーパラメータは-one-hot-encoding)
+    - [主成分分析で時間軸方向に圧縮](#主成分分析で時間軸方向に圧縮)
 
 ---
 
@@ -26,6 +40,8 @@
 > American Express is a globally integrated payments company. The largest payment card issuer in the world, they provide customers with access to products, insights, and experiences that enrich lives and build business success.
 > In this competition, you’ll apply your machine learning skills to predict credit default. Specifically, you will leverage an industrial scale data set to build a machine learning model that challenges the current model in production. Training, validation, and testing datasets include time-series behavioral data and anonymized customer profile information. You're free to explore any technique to create the most powerful model, from creating features to using the data in a more organic way within a model.
 > If successful, you'll help create a better customer experience for cardholders by making it easier to be approved for a credit card. Top solutions could challenge the credit default prediction model used by the world's largest payment card issuer—earning you cash prizes, the opportunity to interview with American Express, and potentially a rewarding new career.
+
+---
 
 ## 2. Data
 
@@ -46,6 +62,8 @@
 -   `train_labels.csv` <font color="red">(30.75MB)</font>`customer_ID`ごとの`target`ラベル
 -   `test_data.csv` <font color="red"><b>(33.82GB)</b></font>テストデータ;`customer_ID`ごとに`target`を予測する
 -   `sample_submission.csv` <font color="red">(61.95MB)</font>正しい形式の提出サンプル
+
+---
 
 ## 3. feather 形式に変換
 
@@ -70,6 +88,8 @@ Package           Version
 pandas            1.4.2
 pyarrow           8.0.0
 ```
+
+---
 
 ## 4. データの概観
 
@@ -251,6 +271,8 @@ pyarrow           8.0.0
 </div>
 </div>
 
+---
+
 #### Spend variables
 
 <div class="block_all">
@@ -293,6 +315,8 @@ pyarrow           8.0.0
 </div>
 </div>
 
+---
+
 #### Payment variables
 
 <div align= "center">
@@ -302,6 +326,8 @@ pyarrow           8.0.0
 <img src="src/timescale_P_4.svg">
 
 </div>
+
+---
 
 #### Balance variables
 
@@ -364,6 +390,8 @@ pyarrow           8.0.0
 
 </div>
 </div>
+
+---
 
 #### Risk variables
 
@@ -466,7 +494,54 @@ pyarrow           8.0.0
     'B_39', 'B_42', 'R_28']
     ```
 
-## LightGBM
+### 4.4. 相関行列と寄与率
+
+#### Delinquency variables
+
+<div align= "center">
+<img src="src\correlation_matrix_D.svg">
+<img src="src\contribution_ratio_D.svg">
+</div>
+
+---
+
+#### Spend variables
+
+<div align= "center">
+<img src="src\correlation_matrix_S.svg">
+<img src="src\contribution_ratio_S.svg">
+</div>
+
+---
+
+#### Payment variables
+
+<div align= "center">
+<img src="src\correlation_matrix_P.svg">
+<img src="src\contribution_ratio_P.svg">
+</div>
+
+---
+
+#### Balance variables
+
+<div align= "center">
+<img src="src\correlation_matrix_B.svg">
+<img src="src\contribution_ratio_B.svg">
+</div>
+
+---
+
+#### Risk variables
+
+<div align= "center">
+<img src="src\correlation_matrix_R.svg">
+<img src="src\contribution_ratio_R.svg">
+</div>
+
+---
+
+## 5.1. LightGBM
 
 https://pypi.org/project/lightgbm/
 
@@ -486,3 +561,88 @@ https://pypi.org/project/lightgbm/
    警告がすごい出る
 
 この手順いらない？`"device":"gpu"`でいけたっぽい
+
+### dart
+
+### 評価関数
+
+```python
+def amex_metric(y_true: np.array, y_pred: np.array) -> float:
+
+    # count of positives and negatives
+    n_pos = y_true.sum()
+    n_neg = y_true.shape[0] - n_pos
+
+    # sorting by descring prediction values
+    indices = np.argsort(y_pred)[::-1]
+    # preds = y_pred[indices]
+    target = y_true[indices]
+
+    # filter the top 4% by cumulative row weights
+    weight = 20.0 - target * 19.0
+    cum_norm_weight = (weight / weight.sum()).cumsum()
+    four_pct_filter = cum_norm_weight <= 0.04
+
+    # default rate captured at 4%
+    d = target[four_pct_filter].sum() / n_pos
+
+    # weighted gini coefficient
+    lorentz = (target / n_pos).cumsum()
+    gini = ((lorentz - cum_norm_weight) * weight).sum()
+
+    # max weighted gini coefficient
+    gini_max = 10 * n_neg * (1 - 19 / (n_pos + 20 * n_neg))
+
+    # normalized weighted gini coefficient
+    g = gini / gini_max
+
+    return 0.5 * (g + d)
+```
+
+## 6.1. 結果
+
+### 顧客毎に最新の 2 明細で学習
+
+-   単純なモデル
+-   gbdt
+-   カテゴリーパラメータは除外
+
+スコア
+
+```
+0.785
+```
+
+### ハイパーパラメータチューニング
+
+-   `optuna`でチューニング
+
+スコア
+
+```
+0.783
+```
+
+### 主成分分析でパラメータを圧縮
+
+-   パラメータを 5 つのカテゴリーに分け、それぞれで PCA モデルを作成、パラメータを圧縮
+-   メモリの消費が激しく、5 つ全部は無理
+
+スコア
+
+```
+0.768 # pca 80%
+0.768 # pca 90%
+```
+
+### パラメータ毎に統計量を算出、カテゴリーパラメータは one-hot-encoding
+
+-   統計量(`["mean", "std", "min", "max", "last"]`)を新たに算出
+-   カテゴリーパラメータに one-hot-encoding を適用、`["sum", "last"]`を作る
+-   パラメータ数が 900 近くになると、optuna がエラーを吐きまくるので、`feature_importance`が低いパラメータは学習から除外
+-   boosting:dart
+-   クロスバリデーション、`Kfold==3`
+
+### 主成分分析で時間軸方向に圧縮
+
+-   各パラメータは時系列データなので、時間軸を無次元化したい

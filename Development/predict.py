@@ -8,7 +8,7 @@ import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
 from sklearn import model_selection
-from matplotlib import pyplot as plt
+from sklearn.model_selection import KFold
 import plotly.express as px
 
 PARAM_SEARCH = True
@@ -29,11 +29,9 @@ class Config():
         "device": "gpu",
         "objective": "binary",
         "boosting": "dart",
-        "max_bin": 250,
-        "max_depth": -1,
+        "verbose": -1,
+        "max_bins": 250,
         "learning_rate": 0.05,
-        'feature_fraction': 0.4,
-        'bagging_fraction': 1.0,
     })
     category_param: list = field(
         default_factory=lambda: [
@@ -45,7 +43,7 @@ class Config():
     remove_param: list = field(
         default_factory=lambda: [
             "S_2",
-            "D_73", "B_29", "D_87", "D_88", "D_110", "D_111", "B_39", "B_42"
+            "D_73", "D_87", "D_88", "D_108", "D_110", "D_111", "B_39", "B_42"
         ]
     )
 
@@ -107,6 +105,7 @@ def preprocess(data: pd.DataFrame):
     ]
     num_data = (
         num_data
+        .fillna(0)
         .groupby("customer_ID")
         .agg(["mean", "std", "min", "max", "last"])
     )
@@ -136,30 +135,85 @@ train_labels = (
     .sort_index()
 )
 # %%
-# パラメータチューニング
-x_train, x_valid, y_train, y_valid = model_selection.train_test_split(
-    train_data,
-    train_labels["target"],
-    test_size=0.25,
-    random_state=0
-)
-train_set = lgb.Dataset(x_train, y_train)
-valid_set = lgb.Dataset(x_valid, y_valid, reference=train_set)
 
+
+def xy_set(x_data: pd.DataFrame, y_data: pd.DataFrame):
+    x_t, x_v, y_t, y_v = model_selection.train_test_split(
+        x_data, y_data,
+        test_size=0.2,
+        random_state=0
+    )
+    t_set = lgb.Dataset(x_t, y_t)
+    v_set = lgb.Dataset(x_v, y_v, reference=t_set)
+
+    return t_set, v_set, x_v, y_v
+
+
+def show_result(model, x_value, y_value):
+    result = model.predict(x_value)
+    score = amex_metric(y_value, result)
+    print(model.params, score, sep="\n")
+    fig = px.histogram(result, nbins=100)
+    fig.show()
+    importance = pd.DataFrame(
+        data={
+            "importance": model.feature_importance(),
+            "col": train_data.columns
+        }
+    ).sort_values(["importance"])
+    fig = px.bar(importance["importance"])
+    fig.show()
+
+    return importance
+
+
+(
+    train_set,
+    valid_set,
+    x_valid,
+    y_valid
+) = xy_set(train_data, train_labels["target"])
+model = lgb.train(
+    CFG.model_param,
+    train_set=train_set,
+    valid_sets=valid_set,
+    feval=lgb_amex_metric,
+    num_boost_round=1000,
+    callbacks=[
+        # lgb.early_stopping(100),
+        lgb.log_evaluation(0),
+    ]
+)
+res_df = show_result(model, x_valid, y_valid)
+res_df["ratio"] = (
+    res_df["importance"]
+    / res_df["importance"].sum()
+    * 100
+)
+use_col = res_df.query("ratio>=0.1")["col"]
+print(use_col)
+# %%
+(
+    train_set,
+    valid_set,
+    x_valid,
+    y_valid
+) = xy_set(train_data[use_col], train_labels["target"])
 match PARAM_SEARCH:
     case True:
-        opt_model = opt_lgb.train(
+        tuner = opt_lgb.LightGBMTunerCV(
             CFG.model_param,
             train_set=train_set,
-            valid_sets=valid_set,
             feval=lgb_amex_metric,
             num_boost_round=500,
+            folds=KFold(n_splits=3),
             callbacks=[
-                lgb.early_stopping(50),
+                # lgb.early_stopping(50),
                 lgb.log_evaluation(0),
             ]
         )
-        param = opt_model.params
+        tuner.run()
+        param = tuner.best_params
     case False:
         param = {
             'feature_pre_filter': False,
@@ -169,36 +223,27 @@ match PARAM_SEARCH:
             'feature_fraction': 0.4,
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
-            'min_child_samples': 10,
-            'num_iterations': 500,
+            'min_child_samples': 10
         }
         # 0.7930567263600699
 # %%
 model = lgb.train(
-    CFG.model_param,
+    CFG.model_param | param,
     train_set=train_set,
     valid_sets=valid_set,
     feval=lgb_amex_metric,
     num_boost_round=1000,
     callbacks=[
-        lgb.early_stopping(100),
+        # lgb.early_stopping(100),
         lgb.log_evaluation(0),
     ]
 )
-# %%
-result = model.predict(x_valid)
-score = amex_metric(y_valid, result)
-print(model.params, score, sep="\n")
-fig = px.histogram(result, nbins=100)
-fig.show()
-lgb.plot_importance(model)
-plt.show()
+show_result(model, x_valid, y_valid)
 # %%
 # predict
 test_data = preprocess(pd.read_feather(CFG.test_data_path))
-# %%
 res_df = pd.DataFrame(
-    data={"prediction": model.predict(test_data)},
+    data={"prediction": model.predict(test_data[use_col])},
     index=test_data.index
 )
 sub_df = pd.read_csv(CFG.sample_submission_path, usecols=["customer_ID"])
