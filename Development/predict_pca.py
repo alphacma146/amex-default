@@ -19,7 +19,7 @@ from amex_base import \
     show_result,\
     save_predict
 
-USE_PICKLE = False
+USE_PICKLE = True
 PARAM_SEARCH = False
 N_COMP = 2
 
@@ -37,9 +37,7 @@ def preprocess(data: pd.DataFrame) -> pd.DataFrame:
 
     data = pd.get_dummies(data, columns=CFG.category_param)
     data.drop(
-        [col for col in ['D_68_0.0_sum', 'D_68_0.0_last',
-                         'D_64_-1_sum', 'D_64_-1_last',
-                         'D_66_0.0_sum', 'D_66_0.0_last']
+        [col for col in ['D_68_0.0', 'D_64_-1', 'D_66_0.0']
          if col in data.columns],
         axis=1,
         inplace=True
@@ -125,7 +123,7 @@ def transform_data(data: pd.DataFrame) -> dict["col":np.array]:
     return comp_dict
 
 
-train_comp = pd.DataFrame(
+train_data = pd.DataFrame(
     data=transform_data(train_data),
     index=train_labels.index
 )
@@ -134,7 +132,7 @@ train_comp = pd.DataFrame(
     valid_set,
     x_valid,
     y_valid
-) = xy_set(train_comp, train_labels["target"])
+) = xy_set(train_data, train_labels["target"])
 
 match PARAM_SEARCH:
     case True:
@@ -154,15 +152,15 @@ match PARAM_SEARCH:
     case False:
         param = {
             'feature_pre_filter': False,
-            'lambda_l1': 1.4226819053888403e-06,
-            'lambda_l2': 1.9956933606815553e-07,
-            'num_leaves': 256,
-            'feature_fraction': 0.4,
-            'bagging_fraction': 0.44442822147008115,
-            'bagging_freq': 5,
-            'min_child_samples': 50
+            'lambda_l1': 1.7896583416748754e-08,
+            'lambda_l2': 2.1012022016175806,
+            'num_leaves': 250,
+            'feature_fraction': 0.8,
+            'bagging_fraction': 0.8851939418050575,
+            'bagging_freq': 1,
+            'min_child_samples': 100,
         }
-        # 0.7420070828137559
+        # 0.76831612669674
 # %%
 model = lgb.train(
     CFG.model_param | param,
@@ -177,15 +175,14 @@ model = lgb.train(
 )
 show_result(model, x_valid, y_valid)
 test_data = preprocess(pd.read_feather(CFG.test_data_path))
-test_comp = pd.DataFrame(
+test_data = pd.DataFrame(
     data=transform_data(test_data),
     index=test_data.index.unique()
 )
 # %%
-print(set(test_comp.columns) ^ set(train_comp.columns))
 save_predict(
     model,
-    test_comp,
+    test_data,
     CFG.sample_submission_path,
     CFG.result_folder_path / "res_sub_pca.csv"
 )
