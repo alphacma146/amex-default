@@ -1,10 +1,31 @@
 [Data]
   ├ [amex-default-prediction]
+  │  ├ .gitkeep
   │  ├ sample_submission.csv
   │  ├ test_data.csv
   │  ├ train_data.csv
   │  └ train_labels.csv
   ├ [feather_data]
+  │  ├ .gitkeep
   │  ├ test_data.ftr
-  │  └ train_data.ftr
+  │  ├ [test_pca]
+  │  │  ├ test_pca_B.ftr
+  │  │  ├ test_pca_D.ftr
+  │  │  ├ test_pca_P.ftr
+  │  │  ├ test_pca_R.ftr
+  │  │  └ test_pca_S.ftr
+  │  ├ test_pca_data.ftr
+  │  ├ train_data.ftr
+  │  ├ [train_pca]
+  │  │  ├ train_pca_B.ftr
+  │  │  ├ train_pca_D.ftr
+  │  │  ├ train_pca_P.ftr
+  │  │  ├ train_pca_R.ftr
+  │  │  └ train_pca_S.ftr
+  │  └ train_pca_data.ftr
+  ├ [result]
+  │  ├ result_submission.csv
+  │  ├ res_sub_agg.csv
+  │  ├ res_sub_lst.csv
+  │  └ res_sub_pca.csv
   └ tree_diagram.txt
