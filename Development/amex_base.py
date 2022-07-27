@@ -23,10 +23,11 @@ class Config():
     model_param: dict = field(default_factory=lambda: {
         "device": "gpu",
         "objective": "binary",
-        "boosting": "dart",
+        "boosting_type": "dart",
         "verbose": -1,
         "max_bins": 250,
         "learning_rate": 0.05,
+        "extra_trees": True,
     })
     category_param: list = field(
         default_factory=lambda: [
@@ -92,22 +93,22 @@ def xy_set(x_data: pd.DataFrame, y_data: pd.DataFrame) -> tuple[pd.DataFrame]:
         test_size=0.2,
         random_state=0
     )
-    t_set = lgb.Dataset(x_t, y_t)
+    t_set = lgb.Dataset(x_t, y_t, categorical_feature='auto')
     v_set = lgb.Dataset(x_v, y_v, reference=t_set)
 
     return t_set, v_set, x_v, y_v
 
 
 def show_result(model, x_value, y_value) -> pd.DataFrame:
-    result = model.predict(x_value)
+    result = model.predict_proba(x_value)[:, 1]
     score = amex_metric(y_value, result)
-    print(model.params, score, sep="\n")
+    print(model.get_params(), score, sep="\n")
     fig = px.histogram(result, nbins=100)
     fig.show()
     importance = pd.DataFrame(
         data={
             "col": x_value.columns,
-            "importance": model.feature_importance()
+            "importance": model.feature_importances_
         }
     ).sort_values(["importance"])
     fig = px.bar(importance, x="col", y="importance")
@@ -125,7 +126,7 @@ def save_predict(
 ) -> None:
     res_df = func(
         pd.DataFrame(
-            data={"prediction": model.predict(data)},
+            data={"prediction": model.predict_proba(data)[:, 1]},
             index=data.index
         )
     )
