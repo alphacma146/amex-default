@@ -4,7 +4,8 @@
 import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
-from sklearn.model_selection import KFold
+from sklearn import model_selection
+from sklearn.model_selection import RepeatedKFold
 # self made
 from amex_base import \
     Config, \
@@ -13,7 +14,8 @@ from amex_base import \
     show_result,\
     save_predict
 
-PARAM_SEARCH = False
+PARAM_SEARCH = True
+ACTIVE_COL = 0.01
 
 CFG = Config()
 # %%
@@ -77,13 +79,18 @@ model = lgb.train(
         lgb.log_evaluation(0),
     ]
 )
-res_df = show_result(model, x_valid, y_valid)
-res_df["ratio"] = (
-    res_df["importance"]
-    / res_df["importance"].sum()
+importance = pd.DataFrame(
+    data={
+        "col": x_valid.columns,
+        "importance": model.feature_importance()
+    }
+).sort_values(["importance"])
+importance["ratio"] = (
+    importance["importance"]
+    / importance["importance"].sum()
     * 100
 )
-use_col = res_df.query("ratio>=0.05")["col"]
+use_col = importance.query(f"ratio>={ACTIVE_COL}")["col"]
 print(use_col)
 # %%
 (
@@ -94,21 +101,24 @@ print(use_col)
 ) = xy_set(train_data[use_col], train_labels["target"])
 match PARAM_SEARCH:
     case True:
+        params = CFG.model_param
+        params["force_col_wise"] = True
         tuner = opt_lgb.LightGBMTunerCV(
-            CFG.model_param,
+            params,
             train_set=train_set,
             feval=lgb_amex_metric,
             num_boost_round=500,
-            folds=KFold(n_splits=3),
+            folds=RepeatedKFold(n_splits=3, n_repeats=3, random_state=37),
+            shuffle=True,
             callbacks=[
                 # lgb.early_stopping(50),
-                lgb.log_evaluation(0),
+                lgb.log_evaluation(50),
             ]
         )
         tuner.run()
-        param = tuner.best_params
+        params = tuner.best_params
     case False:
-        param = {
+        params = {
             'feature_pre_filter': False,
             'lambda_l1': 0.583389841517446,
             'lambda_l2': 5.880437992520181,
@@ -119,19 +129,31 @@ match PARAM_SEARCH:
             'min_child_samples': 50
         }
         # .7852266832010086
-# %%
-model = lgb.train(
-    CFG.model_param | param,
-    train_set=train_set,
-    valid_sets=valid_set,
-    feval=lgb_amex_metric,
-    num_boost_round=1000,
+
+params |= CFG.model_param
+(
+    train_set,
+    x_valid,
+    valid_set,
+    y_valid
+) = model_selection.train_test_split(
+    train_data[use_col], train_labels["target"],
+    test_size=0.2,
+    random_state=0
+)
+model = lgb.LGBMClassifier(**params, num_boost_round=1000)
+model.fit(
+    train_set,
+    valid_set,
+    eval_set=[(x_valid, y_valid)],
+    # eval_metric=lgb_amex_metric,
     callbacks=[
         # lgb.early_stopping(100),
-        lgb.log_evaluation(0),
+        lgb.log_evaluation(50),
     ]
 )
 show_result(model, x_valid, y_valid)
+# %%
 # predict
 test_data = preprocess(pd.read_feather(CFG.test_data_path))
 save_predict(
