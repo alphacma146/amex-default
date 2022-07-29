@@ -132,9 +132,7 @@ save_predict(
     func=lambda x: (
         x
         .groupby(level=0)
-        .agg({"prediction": lambda x: np.power(
-            np.cumprod(x)[-1], 1 / len(x)
-        )})
+        .agg({"prediction": lambda x: np.mean(x)})
     )
 )
 # %%
