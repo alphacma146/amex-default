@@ -1,7 +1,6 @@
 # %%
 # Standard libe
 # Third party
-import numpy as np
 import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
@@ -15,7 +14,7 @@ from amex_base import \
     show_result,\
     save_predict
 
-PARAM_SEARCH = True
+PARAM_SEARCH = False
 ACTIVE_COL = 0.02
 
 CFG = Config()
@@ -31,31 +30,55 @@ def preprocess(data: pd.DataFrame):
         .groupby("customer_ID")
         .transform(lambda x: (x - x.iloc[0]) / pd.Timedelta(1, "D"))
     )
+    data["S_2_day"] = (
+        data[["customer_ID", "S_2"]]
+        .groupby("customer_ID")
+        .transform(lambda x: x.dt.day)
+    )
     data["S_2_interval"] = (
         data[["customer_ID", "S_2"]]
         .groupby("customer_ID")
         .transform(
-            lambda x: [0] + (np.diff(x) / pd.Timedelta(1, "D")).tolist()
+            lambda x: x.diff() / pd.Timedelta(1, "D")
         )
     )
 
     if len(set(CFG.remove_param) & set(data.columns)) != 0:
         data.drop(CFG.remove_param, axis=1, inplace=True)
 
-    cat_data = data[["customer_ID"] + CFG.category_param]
-    num_data = data[
-        [col for col in data.columns if col not in CFG.category_param]
-    ]
+    cat_col = ["customer_ID"] + CFG.category_param
+    num_col = [col for col in data.columns if col not in CFG.category_param]
+
+    cat_data = data[cat_col]
+    num_data = data[num_col]
     num_data = (
         num_data
         .groupby("customer_ID")
-        .agg(["mean", "std", "min", "max", "last"])
+        .agg(["mean", "std", "min", "max", "last", "first"])
     )
     num_data.columns = ["_".join(col_list) for col_list in num_data.columns]
+
+    agg_data = pd.DataFrame(index=num_data.index)
+    agg_list = []
+    for col in [col for col in num_col if col != "customer_ID"]:
+        agg_frag = agg_data.copy()
+        d_last = num_data[f"{col}_last"]
+        d_first = num_data[f"{col}_first"]
+        d_mean = num_data[f"{col}_mean"]
+        d_max = num_data[f"{col}_max"]
+        d_min = num_data[f"{col}_min"]
+        agg_frag[f"{col}_last_first_div"] = d_last / d_first
+        agg_frag[f"{col}_last_mean_sub"] = d_last - d_mean
+        agg_frag[f"{col}_last_mean_div"] = d_last / d_mean
+        agg_frag[f"{col}_last_max_div"] = d_last / d_max
+        agg_frag[f"{col}_last_min_div"] = d_last / d_min
+        agg_list.append(agg_frag)
+    num_data = pd.concat([num_data] + agg_list, axis=1)
+
     cat_data = (
         pd.get_dummies(cat_data, columns=CFG.category_param)
         .groupby("customer_ID")
-        .agg(["sum", "last"])
+        .agg(["sum", "last", "first"])
     )
     cat_data.columns = ["_".join(col_list) for col_list in cat_data.columns]
     cat_data.drop(
