@@ -38,7 +38,7 @@ class Config():
     )
     remove_param: list = field(
         default_factory=lambda: [
-            "S_2",
+            "S_2",  # datetime
             "D_73", "D_87", "D_88", "D_108", "D_110", "D_111", "B_39", "B_42"
         ]
     )

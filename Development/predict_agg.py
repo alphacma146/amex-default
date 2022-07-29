@@ -1,6 +1,7 @@
 # %%
 # Standard libe
 # Third party
+import numpy as np
 import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
@@ -15,14 +16,28 @@ from amex_base import \
     save_predict
 
 PARAM_SEARCH = True
-ACTIVE_COL = 0.01
+ACTIVE_COL = 0.02
 
 CFG = Config()
 # %%
 
 
 def preprocess(data: pd.DataFrame):
+    data["S_2"] = pd.to_datetime(data["S_2"])
     data.sort_values(["customer_ID", "S_2"], inplace=True)
+
+    data["S_2_scale"] = (
+        data[["customer_ID", "S_2"]]
+        .groupby("customer_ID")
+        .transform(lambda x: (x - x.iloc[0]) / pd.Timedelta(1, "D"))
+    )
+    data["S_2_interval"] = (
+        data[["customer_ID", "S_2"]]
+        .groupby("customer_ID")
+        .transform(
+            lambda x: [0] + (np.diff(x) / pd.Timedelta(1, "D")).tolist()
+        )
+    )
 
     if len(set(CFG.remove_param) & set(data.columns)) != 0:
         data.drop(CFG.remove_param, axis=1, inplace=True)
@@ -103,6 +118,7 @@ match PARAM_SEARCH:
     case True:
         params = CFG.model_param
         params["force_col_wise"] = True
+        params["n_jobs"] = 8
         tuner = opt_lgb.LightGBMTunerCV(
             params,
             train_set=train_set,
@@ -119,16 +135,30 @@ match PARAM_SEARCH:
         params = tuner.best_params
     case False:
         params = {
+            'colsample_bytree': 1.0,
+            'importance_type': 'split',
+            'min_child_samples': 100,
+            'min_child_weight': 0.001,
+            'min_split_gain': 0.0,
+            'n_estimators': 100,
+            'n_jobs': 8,
+            'num_leaves': 255,
+            'random_state': None,
+            'reg_alpha': 0.0,
+            'reg_lambda': 0.0,
+            'silent': 'warn',
+            'subsample': 1.0,
+            'subsample_for_bin': 200000,
+            'subsample_freq': 0,
+            'force_col_wise': True,
             'feature_pre_filter': False,
-            'lambda_l1': 0.583389841517446,
-            'lambda_l2': 5.880437992520181,
-            'num_leaves': 214,
+            'lambda_l1': 3.0542906593883284e-06,
+            'lambda_l2': 0.6233074695450682,
             'feature_fraction': 1.0,
-            'bagging_fraction': 0.6810221344608107,
-            'bagging_freq': 1,
-            'min_child_samples': 50
+            'bagging_fraction': 1.0,
+            'bagging_freq': 0,
         }
-        # .7852266832010086
+        # 0.7862325624171822
 
 params |= CFG.model_param
 (
