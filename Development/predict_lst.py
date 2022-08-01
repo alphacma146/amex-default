@@ -6,12 +6,11 @@ import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
 from sklearn.model_selection import RepeatedKFold
-from sklearn import model_selection
 # self made
 from amex_base import \
     Config, \
     lgb_amex_metric,\
-    xy_set,\
+    lgb_crossvalid,\
     show_result,\
     save_predict
 
@@ -48,19 +47,16 @@ train_labels = (
     .set_index('customer_ID', drop=True)
     .sort_index()
 )
-train_data = train_data.merge(
+train_labels = pd.merge(
+    train_data[[]],
     train_labels,
     how="left",
     left_index=True,
     right_index=True
 )
+print(train_labels.head(20))
 # %%
-(
-    train_set,
-    valid_set,
-    x_valid,
-    y_valid
-) = xy_set(train_data.drop(["target"], axis=1), train_data["target"])
+train_set = lgb.Dataset(train_data, train_labels["target"])
 match PARAM_SEARCH:
     case True:
         params = CFG.model_param
@@ -94,29 +90,19 @@ match PARAM_SEARCH:
         # 0.8102238689267146
 # %%
 params |= CFG.model_param
-(
-    train_set,
-    x_valid,
-    valid_set,
-    y_valid
-) = model_selection.train_test_split(
-    train_data.drop(["target"], axis=1),
-    train_data["target"],
-    test_size=0.2,
-    random_state=0
-)
+cv_score = lgb_crossvalid(train_data, train_labels["target"], params)
+print(f"Amex CVScore: {np.mean(cv_score)}")
+
 model = lgb.LGBMClassifier(**params, num_boost_round=1000)
 model.fit(
-    train_set,
-    valid_set,
-    eval_set=[(x_valid, y_valid)],
-    # eval_metric=lgb_amex_metric,
+    train_data,
+    train_labels["target"],
     callbacks=[
         # lgb.early_stopping(100),
         lgb.log_evaluation(50),
     ]
 )
-show_result(model, x_valid, y_valid)
+show_result(model, train_data, train_labels["target"])
 # %%
 # predict
 test_data = (

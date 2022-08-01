@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 from sklearn import model_selection
+from sklearn.model_selection import RepeatedKFold
+from tqdm import tqdm
 import plotly.express as px
 
 
@@ -97,6 +99,28 @@ def xy_set(x_data: pd.DataFrame, y_data: pd.DataFrame) -> tuple[pd.DataFrame]:
     v_set = lgb.Dataset(x_v, y_v, reference=t_set)
 
     return t_set, v_set, x_v, y_v
+
+
+def lgb_crossvalid(data: pd.DataFrame, label: pd.DataFrame, params: dict):
+    res_score = []
+    kf = RepeatedKFold(n_splits=3, n_repeats=3, random_state=37)
+    for tr_idx, va_idx in tqdm(kf.split(data)):
+        tr_x, tr_y = data.iloc[tr_idx], label.iloc[tr_idx]
+        va_x, va_y = data.iloc[va_idx], label.iloc[va_idx]
+        model = lgb.LGBMClassifier(**params, num_boost_round=500)
+        model.fit(
+            tr_x, tr_y,
+            eval_set=[(va_x, va_y)],
+            callbacks=[
+                # lgb.early_stopping(100),
+                lgb.log_evaluation(0),
+            ]
+        )
+        res_score.append(
+            amex_metric(va_y, model.predict_proba(va_x)[:, 1])
+        )
+
+    return res_score
 
 
 def show_result(model, x_value, y_value) -> pd.DataFrame:
