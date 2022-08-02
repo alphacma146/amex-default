@@ -1,15 +1,17 @@
 # %%
 # Standard libe
+import gc
 # Third party
+import numpy as np
 import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
-from sklearn import model_selection
 from sklearn.model_selection import RepeatedKFold
 # self made
 from amex_base import \
     Config, \
     lgb_amex_metric,\
+    lgb_crossvalid,\
     xy_set,\
     show_result,\
     save_predict
@@ -19,9 +21,12 @@ ACTIVE_COL = 0.02
 
 CFG = Config()
 # %%
+# 前処理
 
 
 def preprocess(data: pd.DataFrame):
+    # 時間データ
+    MONTH = 30.5
     data["S_2"] = pd.to_datetime(data["S_2"])
     data.sort_values(["customer_ID", "S_2"], inplace=True)
 
@@ -30,11 +35,13 @@ def preprocess(data: pd.DataFrame):
         .groupby("customer_ID")
         .transform(lambda x: (x - x.iloc[0]) / pd.Timedelta(1, "D"))
     )
+    data["S_2_scale"] = data["S_2_scale"].astype(np.int16)
     data["S_2_day"] = (
         data[["customer_ID", "S_2"]]
         .groupby("customer_ID")
         .transform(lambda x: x.dt.day)
     )
+    data["S_2_day"] = data["S_2_day"].astype(np.int16)
     data["S_2_interval"] = (
         data[["customer_ID", "S_2"]]
         .groupby("customer_ID")
@@ -42,15 +49,38 @@ def preprocess(data: pd.DataFrame):
             lambda x: x.diff() / pd.Timedelta(1, "D")
         )
     )
+    data["S_2_interval"].fillna(MONTH, inplace=True)
+    data["S_2_interval"] = data["S_2_interval"].astype(np.float16)
 
+    # データ数が少ないパラメータを削除
     if len(set(CFG.remove_param) & set(data.columns)) != 0:
         data.drop(CFG.remove_param, axis=1, inplace=True)
 
+    # 時間の差分で補正
+    ignore_col = CFG.category_param + ["customer_ID", "S_2_scale", "S_2_day"]
+    num_col = [col for col in data.columns if col not in ignore_col]
+    interval_data = data["S_2_interval"].copy()
+    data.loc[:, num_col] = data[num_col].apply(
+        lambda x: x * MONTH / x.S_2_interval, axis=1
+    )
+    data["S_2_interval"] = interval_data
+
+    # パラメータを組み合わせて新たな特徴量を作成
+    for c_col, p_col in [
+        (c_col, p_col)
+        for c_col in ["B_11", "B_14", "B_17", "D_39", "D_131", "S_16", "S_23"]
+        for p_col in ["P_2", "P_3"]
+    ]:
+        data[f"{c_col}-{p_col}"] = data[c_col] - data[p_col]
+        data[f"{c_col}/{p_col}"] = data[c_col] / data[p_col]
+
+    # カテゴリーデータ->one hot encoding
+    # 数値データ->集約データ
     cat_col = ["customer_ID"] + CFG.category_param
     num_col = [col for col in data.columns if col not in CFG.category_param]
-
     cat_data = data[cat_col]
     num_data = data[num_col]
+
     num_data = (
         num_data
         .groupby("customer_ID")
@@ -81,6 +111,8 @@ def preprocess(data: pd.DataFrame):
         .agg(["sum", "last", "first"])
     )
     cat_data.columns = ["_".join(col_list) for col_list in cat_data.columns]
+
+    # testデータに含まれない値
     cat_data.drop(
         [col for col in ['D_68_0.0_sum', 'D_68_0.0_last',
                          'D_64_-1_sum', 'D_64_-1_last',
@@ -89,6 +121,8 @@ def preprocess(data: pd.DataFrame):
         axis=1,
         inplace=True
     )
+
+    gc.collect()
 
     return pd.merge(num_data, cat_data, left_index=True, right_index=True)
 
@@ -100,12 +134,20 @@ train_labels = (
     .sort_index()
 )
 # %%
+# 重要度が低いパラメータを学習から除外
+train_labels = pd.merge(
+    train_data[[]],
+    train_labels,
+    how="left",
+    left_index=True,
+    right_index=True
+)
 (
     train_set,
     valid_set,
     x_valid,
     y_valid
-) = xy_set(train_data, train_labels["target"])
+) = xy_set(train_data, train_labels)
 model = lgb.train(
     CFG.model_param,
     train_set=train_set,
@@ -131,12 +173,8 @@ importance["ratio"] = (
 use_col = importance.query(f"ratio>={ACTIVE_COL}")["col"]
 print(use_col)
 # %%
-(
-    train_set,
-    valid_set,
-    x_valid,
-    y_valid
-) = xy_set(train_data[use_col], train_labels["target"])
+# パラメータチューニング
+train_set = lgb.Dataset(train_data, train_labels)
 match PARAM_SEARCH:
     case True:
         params = CFG.model_param
@@ -147,7 +185,7 @@ match PARAM_SEARCH:
             train_set=train_set,
             feval=lgb_amex_metric,
             num_boost_round=500,
-            folds=RepeatedKFold(n_splits=3, n_repeats=3, random_state=37),
+            folds=RepeatedKFold(n_splits=3, n_repeats=1, random_state=37),
             shuffle=True,
             callbacks=[
                 # lgb.early_stopping(50),
@@ -181,31 +219,24 @@ match PARAM_SEARCH:
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
         }
-        # 0.7862325624171822
+        # 0.7883137925427842
 
 params |= CFG.model_param
-(
-    train_set,
-    x_valid,
-    valid_set,
-    y_valid
-) = model_selection.train_test_split(
-    train_data[use_col], train_labels["target"],
-    test_size=0.2,
-    random_state=0
-)
+# cross validation
+cv_score = lgb_crossvalid(train_data[use_col], train_labels["target"], params)
+print(f"Amex CVScore: {np.mean(cv_score)}")
+# create model
 model = lgb.LGBMClassifier(**params, num_boost_round=1000)
 model.fit(
-    train_set,
-    valid_set,
-    eval_set=[(x_valid, y_valid)],
-    # eval_metric=lgb_amex_metric,
+    train_data,
+    train_labels["target"],
     callbacks=[
         # lgb.early_stopping(100),
         lgb.log_evaluation(50),
     ]
 )
-show_result(model, x_valid, y_valid)
+# visualize
+show_result(model, train_data, train_labels["target"])
 # %%
 # predict
 test_data = preprocess(pd.read_feather(CFG.test_data_path))

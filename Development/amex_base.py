@@ -90,6 +90,9 @@ def lgb_amex_metric(y_pred, y_true) -> tuple:
 
 
 def xy_set(x_data: pd.DataFrame, y_data: pd.DataFrame) -> tuple[pd.DataFrame]:
+    """
+    split data
+    """
     x_t, x_v, y_t, y_v = model_selection.train_test_split(
         x_data, y_data,
         test_size=0.2,
@@ -101,7 +104,14 @@ def xy_set(x_data: pd.DataFrame, y_data: pd.DataFrame) -> tuple[pd.DataFrame]:
     return t_set, v_set, x_v, y_v
 
 
-def lgb_crossvalid(data: pd.DataFrame, label: pd.DataFrame, params: dict):
+def lgb_crossvalid(
+    data: pd.DataFrame,
+    label: pd.DataFrame,
+    params: dict
+) -> list:
+    """
+    corss validation
+    """
     res_score = []
     kf = RepeatedKFold(n_splits=3, n_repeats=3, random_state=37)
     for tr_idx, va_idx in tqdm(kf.split(data)):
@@ -111,6 +121,7 @@ def lgb_crossvalid(data: pd.DataFrame, label: pd.DataFrame, params: dict):
         model.fit(
             tr_x, tr_y,
             eval_set=[(va_x, va_y)],
+            # eval_metric=lgb_amex_metric,
             callbacks=[
                 # lgb.early_stopping(100),
                 lgb.log_evaluation(0),
@@ -124,6 +135,9 @@ def lgb_crossvalid(data: pd.DataFrame, label: pd.DataFrame, params: dict):
 
 
 def show_result(model, x_value, y_value) -> pd.DataFrame:
+    """
+    show result histogram and importance values
+    """
     result = model.predict_proba(x_value)[:, 1]
     score = amex_metric(y_value, result)
     print(model.get_params(), score, sep="\n")
@@ -148,6 +162,9 @@ def save_predict(
     save_path: Path,
     func=lambda x: x
 ) -> None:
+    """
+    save submission as csv
+    """
     res_df = func(
         pd.DataFrame(
             data={"prediction": model.predict_proba(data)[:, 1]},
