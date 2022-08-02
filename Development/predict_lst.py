@@ -1,5 +1,8 @@
 # %%
-# Standard libe
+"""
+最新の3明細で学習
+"""
+# Standard lib
 # Third party
 import numpy as np
 import pandas as pd
@@ -19,10 +22,13 @@ NUM_STATEMENT = 3
 
 CFG = Config()
 # %%
+# 前処理
 
 
 def preprocess(data: pd.DataFrame) -> pd.DataFrame:
 
+    # 最新3明細を取得
+    # one hot encoding
     data = pd.get_dummies(
         (data
          .groupby("customer_ID")
@@ -54,8 +60,8 @@ train_labels = pd.merge(
     left_index=True,
     right_index=True
 )
-print(train_labels.head(20))
 # %%
+# パラメータチューニング
 train_set = lgb.Dataset(train_data, train_labels["target"])
 match PARAM_SEARCH:
     case True:
@@ -89,6 +95,7 @@ match PARAM_SEARCH:
         }
         # 0.8102238689267146
 # %%
+# create model
 params |= CFG.model_param
 cv_score = lgb_crossvalid(train_data, train_labels["target"], params)
 print(f"Amex CVScore: {np.mean(cv_score)}")
