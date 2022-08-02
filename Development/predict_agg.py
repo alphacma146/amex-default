@@ -1,5 +1,9 @@
 # %%
-# Standard libe
+"""
+集約データを作成
+時間軸で補正をかける
+"""
+# Standard lib
 import gc
 # Third party
 import numpy as np
