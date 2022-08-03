@@ -21,7 +21,7 @@ from amex_base import \
     save_predict
 
 PARAM_SEARCH = False
-ACTIVE_COL = 0.02
+ACTIVE_COL = 0.03
 
 CFG = Config()
 # %%
@@ -137,8 +137,6 @@ train_labels = (
     .set_index('customer_ID', drop=True)
     .sort_index()
 )
-# %%
-# 重要度が低いパラメータを学習から除外
 train_labels = pd.merge(
     train_data[[]],
     train_labels,
@@ -146,11 +144,13 @@ train_labels = pd.merge(
     left_index=True,
     right_index=True
 )
+# %%
+# 重要度が低いパラメータを学習から除外
 (
     train_set,
     valid_set,
     x_valid,
-    y_valid
+    _
 ) = xy_set(train_data, train_labels)
 model = lgb.train(
     CFG.model_param,
@@ -176,6 +176,7 @@ importance["ratio"] = (
 )
 use_col = importance.query(f"ratio>={ACTIVE_COL}")["col"]
 print(use_col)
+train_data = train_data[use_col]
 # %%
 # パラメータチューニング
 train_set = lgb.Dataset(train_data, train_labels)
@@ -224,11 +225,11 @@ match PARAM_SEARCH:
             'bagging_freq': 0,
         }
         # 0.7883137925427842
-
 params |= CFG.model_param
 # cross validation
-cv_score = lgb_crossvalid(train_data[use_col], train_labels["target"], params)
+cv_score = lgb_crossvalid(train_data, train_labels["target"], params)
 print(f"Amex CVScore: {np.mean(cv_score)}")
+# %%
 # create model
 model = lgb.LGBMClassifier(**params, num_boost_round=1000)
 model.fit(
