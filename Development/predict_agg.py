@@ -201,14 +201,16 @@ match PARAM_SEARCH:
         params = tuner.best_params
     case False:
         params = {
+            'class_weight': None,
             'colsample_bytree': 1.0,
             'importance_type': 'split',
+            'max_depth': -1,
             'min_child_samples': 100,
             'min_child_weight': 0.001,
             'min_split_gain': 0.0,
             'n_estimators': 100,
             'n_jobs': 8,
-            'num_leaves': 255,
+            'num_leaves': 253,
             'random_state': None,
             'reg_alpha': 0.0,
             'reg_lambda': 0.0,
@@ -218,13 +220,13 @@ match PARAM_SEARCH:
             'subsample_freq': 0,
             'force_col_wise': True,
             'feature_pre_filter': False,
-            'lambda_l1': 3.0542906593883284e-06,
-            'lambda_l2': 0.6233074695450682,
+            'lambda_l1': 0.3954209289845539,
+            'lambda_l2': 0.0026164835702313406,
             'feature_fraction': 1.0,
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
         }
-        # 0.7883137925427842
+        # Amex CVScore: 0.7860269702041897
 params |= CFG.model_param
 # cross validation
 cv_score = lgb_crossvalid(train_data, train_labels["target"], params)
@@ -237,14 +239,21 @@ model.fit(
     train_labels["target"],
     callbacks=[
         # lgb.early_stopping(100),
-        lgb.log_evaluation(50),
+        lgb.log_evaluation(200),
     ]
 )
 # visualize
 show_result(model, train_data, train_labels["target"])
+del train_data
 # %%
 # predict
-test_data = preprocess(pd.read_feather(CFG.test_data_path))
+test_data = pd.read_feather(CFG.test_data_path)
+split_list = []
+for chunk in np.array_split(test_data["customer_ID"].unique()):
+    split = pd.merge(test_data, chunk, how="inner", on="customer_ID")
+    print(split)
+    split_list.append(preprocess(split))
+test_data = pd.concat(split_list, axis=0)
 save_predict(
     model,
     test_data[use_col],
