@@ -1,4 +1,8 @@
 # %%
+"""
+移動平均を算出
+時間軸方向にPCAで圧縮
+"""
 # Standard lib
 import pickle
 # Third party
@@ -6,7 +10,6 @@ import numpy as np
 import pandas as pd
 import optuna.integration.lightgbm as opt_lgb
 import lightgbm as lgb
-from sklearn import model_selection
 from sklearn.model_selection import RepeatedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -16,38 +19,47 @@ from tqdm import tqdm
 from amex_base import \
     Config, \
     lgb_amex_metric,\
-    xy_set,\
+    lgb_crossvalid,\
     show_result,\
     save_predict
 
-USE_PICKLE = True
-PARAM_SEARCH = False
+USE_PICKLE = False
+PARAM_SEARCH = True
 N_COMP = 2
 
 CFG = Config()
 # %%
+# 前処理
 
 
 def preprocess(data: pd.DataFrame) -> pd.DataFrame:
 
     data.sort_values(["customer_ID", "S_2"], inplace=True)
-    data.fillna(0, inplace=True)
 
     if len(set(CFG.remove_param) & set(data.columns)) != 0:
         data = data.drop(CFG.remove_param, axis=1)
 
+    # 移動平均
+    # 最新2明細は0なので除外
     data = pd.get_dummies(data, columns=CFG.category_param)
+    data = (
+        data
+        .groupby("customer_ID", as_index=False)
+        .rolling(3)
+        .mean()
+        .groupby("customer_ID", as_index=False)
+        .tail(-2)
+    )
+    data.set_index("customer_ID", inplace=True)
     data.drop(
         [col for col in ['D_68_0.0', 'D_64_-1', 'D_66_0.0']
          if col in data.columns],
         axis=1,
         inplace=True
     )
+    data.fillna(0, inplace=True)
 
-    return (
-        data
-        .set_index("customer_ID", drop=True)
-    )
+    return data
 
 
 train_data = preprocess(pd.read_feather(CFG.train_data_path))
@@ -57,27 +69,35 @@ train_labels = (
     .sort_index()
 )
 # %%
+# create PCA model and save pickle
 
 
 def transpose_data(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    顧客別に明細を転置
+    """
 
+    ST_NUM = 11
     res_list = []
 
     for cid, df in data.groupby("customer_ID").__iter__():
         df_val = list(df.values)
-        if (df_len := len(df_val)) != 13:
-            df_val = [0] * (13 - df_len) + df_val
+        if (df_len := len(df_val)) != ST_NUM:
+            df_val = [0] * (ST_NUM - df_len) + df_val
         res_list.append([cid] + df_val)
 
     return pd.DataFrame(
         data=res_list,
         columns=np.concatenate(
-            [["id"], [f"series_{i}" for i in np.arange(13)]]
+            [["id"], [f"series_{i}" for i in np.arange(ST_NUM)]]
         )
     ).set_index("id", drop=True)
 
 
 def create_model(data: pd.DataFrame) -> tuple[PCA, np.array]:
+    """
+    PCA model
+    """
 
     ss = StandardScaler()
     pca = PCA(n_components=N_COMP, svd_solver="full")
@@ -89,7 +109,7 @@ def create_model(data: pd.DataFrame) -> tuple[PCA, np.array]:
 
 match USE_PICKLE:
     case True:
-        with open("model_score.pickle", mode="rb") as f:
+        with open("model_score.pkl", mode="rb") as f:
             model_dict = pickle.load(f)
             score_dict = pickle.load(f)
     case False:
@@ -99,19 +119,23 @@ match USE_PICKLE:
             t_data = transpose_data(train_data[col])
             model_dict[col], score_dict[col] = create_model(t_data)
 
-        with open("model_score.pickle", mode="wb") as f:
+        with open("model_score.pkl", mode="wb") as f:
             pickle.dump(model_dict, f)
             pickle.dump(score_dict, f)
 
 score_df = pd.DataFrame(
-    [x[-1] for x in score_dict.values()], index=score_dict.keys()
+    [x for _, x in score_dict.values()], index=score_dict.keys()
 )
 fig = px.bar(score_df)
 fig.show()
 # %%
+# パラメータチューニング
 
 
 def transform_data(data: pd.DataFrame) -> dict["col":np.array]:
+    """
+    圧縮して変換
+    """
     comp_dict = {}
     ss = StandardScaler()
     for col in tqdm(data.columns):
@@ -126,14 +150,16 @@ def transform_data(data: pd.DataFrame) -> dict["col":np.array]:
 
 train_data = pd.DataFrame(
     data=transform_data(train_data),
-    index=train_labels.index
+    index=train_data.index.unique()
 )
-(
-    train_set,
-    valid_set,
-    x_valid,
-    y_valid
-) = xy_set(train_data, train_labels["target"])
+train_labels = pd.merge(
+    train_data[[]],
+    train_labels,
+    how="left",
+    left_index=True,
+    right_index=True
+)
+train_set = lgb.Dataset(train_data, train_labels["target"])
 
 match PARAM_SEARCH:
     case True:
@@ -142,7 +168,7 @@ match PARAM_SEARCH:
             train_set=train_set,
             feval=lgb_amex_metric,
             num_boost_round=500,
-            folds=RepeatedKFold(n_splits=3, n_repeats=3, random_state=37),
+            folds=RepeatedKFold(n_splits=3, n_repeats=1, random_state=37),
             shuffle=True,
             callbacks=[
                 # lgb.early_stopping(50),
@@ -153,41 +179,48 @@ match PARAM_SEARCH:
         params = tuner.best_params
     case False:
         params = {
+            'class_weight': None,
+            'colsample_bytree': 1.0,
+            'importance_type': 'split',
+            'min_child_samples': 50,
+            'min_child_weight': 0.001,
+            'min_split_gain': 0.0,
+            'n_estimators': 100,
+            'num_leaves': 243,
+            'random_state': None,
+            'reg_alpha': 0.0,
+            'reg_lambda': 0.0,
+            'silent': 'warn',
+            'subsample': 1.0,
+            'subsample_for_bin': 200000,
+            'subsample_freq': 0,
             'feature_pre_filter': False,
-            'lambda_l1': 1.7896583416748754e-08,
-            'lambda_l2': 2.1012022016175806,
-            'num_leaves': 250,
-            'feature_fraction': 0.8,
-            'bagging_fraction': 0.8851939418050575,
-            'bagging_freq': 1,
-            'min_child_samples': 100,
+            'lambda_l1': 1.2958112509809807e-07,
+            'lambda_l2': 0.3594257455906693,
+            'feature_fraction': 1.0,
+            'bagging_fraction': 1.0,
+            'bagging_freq': 0,
         }
-        # 0.76831612669674
+        # Amex CVScore: 0.7659090803590255
 # %%
+# create model
 params |= CFG.model_param
-(
-    train_set,
-    x_valid,
-    valid_set,
-    y_valid
-) = model_selection.train_test_split(
-    train_data, train_labels["target"],
-    test_size=0.2,
-    random_state=0
-)
+cv_score = lgb_crossvalid(train_data, train_labels["target"], params)
+print(f"Amex CVScore: {np.mean(cv_score)}")
+
 model = lgb.LGBMClassifier(**params, num_boost_round=1000)
 model.fit(
-    train_set,
-    valid_set,
-    eval_set=[(x_valid, y_valid)],
-    # eval_metric=lgb_amex_metric,
+    train_data,
+    train_labels["target"],
     callbacks=[
         # lgb.early_stopping(100),
-        lgb.log_evaluation(50),
+        lgb.log_evaluation(200),
     ]
 )
-show_result(model, x_valid, y_valid)
+show_result(model, train_data, train_labels["target"])
 # %%
+# predict
+del train_data
 test_data = preprocess(pd.read_feather(CFG.test_data_path))
 test_data = pd.DataFrame(
     data=transform_data(test_data),

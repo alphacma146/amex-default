@@ -26,7 +26,6 @@ class Config():
         "device": "gpu",
         "objective": "binary",
         "boosting_type": "dart",
-        "verbose": -1,
         "max_bins": 250,
         "learning_rate": 0.05,
         "extra_trees": True,
