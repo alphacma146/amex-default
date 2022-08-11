@@ -1,4 +1,4 @@
-# Standard libe
+# Standard lib
 from pathlib import Path
 from dataclasses import dataclass, field
 # Third party

@@ -23,8 +23,8 @@ from amex_base import \
     show_result,\
     save_predict
 
-USE_PICKLE = False
-PARAM_SEARCH = True
+USE_PICKLE = True
+PARAM_SEARCH = False
 N_COMP = 2
 
 CFG = Config()
@@ -40,16 +40,28 @@ def preprocess(data: pd.DataFrame) -> pd.DataFrame:
         data = data.drop(CFG.remove_param, axis=1)
 
     # 移動平均
+    for col in [
+        col for col in data.columns
+        if col not in ["customer_ID"] + CFG.category_param
+    ]:
+        data[col] = (
+            data[["customer_ID", col]]
+            .groupby("customer_ID", as_index=False)
+            .rolling(3)
+            .mean()
+        )[col]
+        data[col].astype(np.float16)
+
     # 最新2明細は0なので除外
-    data = pd.get_dummies(data, columns=CFG.category_param)
     data = (
         data
         .groupby("customer_ID", as_index=False)
-        .rolling(3)
-        .mean()
-        .groupby("customer_ID", as_index=False)
         .tail(-2)
     )
+
+    # one hot
+    data = pd.get_dummies(data, columns=CFG.category_param)
+
     data.set_index("customer_ID", inplace=True)
     data.drop(
         [col for col in ['D_68_0.0', 'D_64_-1', 'D_66_0.0']

@@ -5,6 +5,7 @@
 """
 # Standard lib
 import gc
+import copy
 # Third party
 import numpy as np
 import pandas as pd
@@ -61,13 +62,13 @@ def preprocess(data: pd.DataFrame):
         data.drop(CFG.remove_param, axis=1, inplace=True)
 
     # 時間の差分で補正
-    ignore_col = CFG.category_param + ["customer_ID", "S_2_scale", "S_2_day"]
-    num_col = [col for col in data.columns if col not in ignore_col]
-    interval_data = data["S_2_interval"].copy()
-    data.loc[:, num_col] = data[num_col].apply(
-        lambda x: x * MONTH / x.S_2_interval, axis=1
-    )
-    data["S_2_interval"] = interval_data
+    # ignore_col = CFG.category_param + ["customer_ID", "S_2_scale", "S_2_day"]
+    # num_col = [col for col in data.columns if col not in ignore_col]
+    # interval_data = data["S_2_interval"].copy()
+    # data.loc[:, num_col] = data[num_col].apply(
+    #     lambda x: x * MONTH / x.S_2_interval, axis=1
+    # )
+    # data["S_2_interval"] = interval_data
 
     # パラメータを組み合わせて新たな特徴量を作成
     for c_col, p_col in [
@@ -182,18 +183,19 @@ train_data = train_data[use_col]
 train_set = lgb.Dataset(train_data, train_labels)
 match PARAM_SEARCH:
     case True:
-        params = CFG.model_param
+        params = copy.deepcopy(CFG.model_param)
+        params["boosting_type"] = "gbdt"
         params["force_col_wise"] = True
         params["n_jobs"] = 8
         tuner = opt_lgb.LightGBMTunerCV(
             params,
             train_set=train_set,
-            feval=lgb_amex_metric,
+            # feval=lgb_amex_metric,
             num_boost_round=500,
             folds=RepeatedKFold(n_splits=3, n_repeats=1, random_state=37),
             shuffle=True,
             callbacks=[
-                # lgb.early_stopping(50),
+                lgb.early_stopping(50),
                 lgb.log_evaluation(50),
             ]
         )
@@ -204,13 +206,11 @@ match PARAM_SEARCH:
             'class_weight': None,
             'colsample_bytree': 1.0,
             'importance_type': 'split',
-            'max_depth': -1,
             'min_child_samples': 100,
             'min_child_weight': 0.001,
             'min_split_gain': 0.0,
             'n_estimators': 100,
-            'n_jobs': 8,
-            'num_leaves': 253,
+            'num_leaves': 70,
             'random_state': None,
             'reg_alpha': 0.0,
             'reg_lambda': 0.0,
@@ -218,11 +218,10 @@ match PARAM_SEARCH:
             'subsample': 1.0,
             'subsample_for_bin': 200000,
             'subsample_freq': 0,
-            'force_col_wise': True,
             'feature_pre_filter': False,
-            'lambda_l1': 0.3954209289845539,
-            'lambda_l2': 0.0026164835702313406,
-            'feature_fraction': 1.0,
+            'lambda_l1': 2.248670398035466,
+            'lambda_l2': 0.00017323689715389868,
+            'feature_fraction': 0.44800000000000006,
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
         }
@@ -247,13 +246,7 @@ show_result(model, train_data, train_labels["target"])
 del train_data
 # %%
 # predict
-test_data = pd.read_feather(CFG.test_data_path)
-split_list = []
-for chunk in np.array_split(test_data["customer_ID"].unique()):
-    split = pd.merge(test_data, chunk, how="inner", on="customer_ID")
-    print(split)
-    split_list.append(preprocess(split))
-test_data = pd.concat(split_list, axis=0)
+test_data = preprocess(pd.read_feather(CFG.test_data_path))
 save_predict(
     model,
     test_data[use_col],
