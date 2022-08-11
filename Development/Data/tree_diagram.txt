@@ -24,8 +24,9 @@
   │  │  └ train_pca_S.ftr
   │  └ train_pca_data.ftr
   ├ [result]
-  │  ├ result_submission.csv
   │  ├ res_sub_agg.csv
   │  ├ res_sub_lst.csv
   │  └ res_sub_pca.csv
+  ├ result_mean.csv
+  ├ result_submission.csv
   └ tree_diagram.txt
