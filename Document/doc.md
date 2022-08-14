@@ -613,6 +613,9 @@ predict_lst.py
 0.789
 ```
 
+@import "src/predict_lst_histo.html"
+@import "src/predict_lst_param.html"
+
 ### 主成分分析で時間軸情報を圧縮
 
 -   時間軸方向で component=2 に圧縮
@@ -625,6 +628,9 @@ predict_lst.py
 predict_pca.py
 0.769
 ```
+
+@import "src/predict_pca_histo.html"
+@import "src/predict_pca_param.html"
 
 ### パラメータ毎に統計量を算出
 
@@ -639,3 +645,6 @@ predict_pca.py
 predict_agg.py
 0.793
 ```
+
+@import "src/predict_agg_histo.html"
+@import "src/predict_agg_param.html"
