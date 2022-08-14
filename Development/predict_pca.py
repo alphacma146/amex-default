@@ -4,6 +4,7 @@
 時間軸方向にPCAで圧縮
 """
 # Standard lib
+from pathlib import Path
 import pickle
 # Third party
 import numpy as np
@@ -213,7 +214,7 @@ match PARAM_SEARCH:
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
         }
-        # Amex CVScore: 0.7659090803590255
+        # Amex CVScore: 0.7663984980201398
 # %%
 # create model
 params |= CFG.model_param
@@ -229,7 +230,7 @@ model.fit(
         lgb.log_evaluation(200),
     ]
 )
-show_result(model, train_data, train_labels["target"])
+show_result(model, train_data, train_labels["target"], Path(__file__).stem)
 # %%
 # predict
 del train_data

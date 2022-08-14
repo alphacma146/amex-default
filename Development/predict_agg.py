@@ -4,6 +4,7 @@
 時間軸で補正をかける
 """
 # Standard lib
+from pathlib import Path
 import gc
 import copy
 # Third party
@@ -225,7 +226,7 @@ match PARAM_SEARCH:
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
         }
-        # Amex CVScore: 0.7860269702041897
+        # Amex CVScore: 0.787981641932271
 params |= CFG.model_param
 # cross validation
 cv_score = lgb_crossvalid(train_data, train_labels["target"], params)
@@ -242,7 +243,7 @@ model.fit(
     ]
 )
 # visualize
-show_result(model, train_data, train_labels["target"])
+show_result(model, train_data, train_labels["target"], Path(__file__).stem)
 del train_data
 # %%
 # predict

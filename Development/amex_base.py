@@ -133,7 +133,7 @@ def lgb_crossvalid(
     return res_score
 
 
-def show_result(model, x_value, y_value) -> pd.DataFrame:
+def show_result(model, x_value, y_value, name="file_name") -> pd.DataFrame:
     """
     show result histogram and importance values
     """
@@ -141,6 +141,7 @@ def show_result(model, x_value, y_value) -> pd.DataFrame:
     score = amex_metric(y_value, result)
     print(model.get_params(), score, sep="\n")
     fig = px.histogram(result, nbins=100)
+    fig.write_html(name + "_histo.html")
     fig.show()
     importance = pd.DataFrame(
         data={
@@ -149,6 +150,7 @@ def show_result(model, x_value, y_value) -> pd.DataFrame:
         }
     ).sort_values(["importance"])
     fig = px.bar(importance, x="col", y="importance")
+    fig.write_html(name + "_param.html")
     fig.show()
 
     return importance

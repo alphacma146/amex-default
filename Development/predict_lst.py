@@ -3,6 +3,8 @@
 最新の3明細で学習
 """
 # Standard lib
+from pathlib import Path
+import copy
 # Third party
 import numpy as np
 import pandas as pd
@@ -12,10 +14,10 @@ from sklearn.model_selection import RepeatedKFold
 # self made
 from amex_base import \
     Config, \
-    lgb_amex_metric,\
     lgb_crossvalid,\
     show_result,\
     save_predict
+# lgb_amex_metric
 
 PARAM_SEARCH = False
 NUM_STATEMENT = 3
@@ -65,35 +67,49 @@ train_labels = pd.merge(
 train_set = lgb.Dataset(train_data, train_labels["target"])
 match PARAM_SEARCH:
     case True:
-        params = CFG.model_param
+        params = copy.deepcopy(CFG.model_param)
+        params["boosting_type"] = "gbdt"
         params["force_row_wise"] = True
+        params["n_jobs"] = 8
         tuner = opt_lgb.LightGBMTunerCV(
             params,
             train_set=train_set,
-            feval=lgb_amex_metric,
+            # feval=lgb_amex_metric,
             num_boost_round=500,
-            folds=RepeatedKFold(n_splits=3, n_repeats=3, random_state=37),
+            folds=RepeatedKFold(n_splits=3, n_repeats=1, random_state=37),
             shuffle=True,
             callbacks=[
-                # lgb.early_stopping(50),
-                lgb.log_evaluation(0),
+                lgb.early_stopping(50),
+                lgb.log_evaluation(50),
             ]
         )
         tuner.run()
         params = tuner.best_params
     case False:
         params = {
-            'force_row_wise': True,
-            'feature_pre_filter': False,
-            'lambda_l1': 0.7575741231595549,
-            'lambda_l2': 0.006559531182232793,
+            'class_weight': None,
+            'colsample_bytree': 1.0,
+            'importance_type': 'split',
+            'min_child_samples': 20,
+            'min_child_weight': 0.001,
+            'min_split_gain': 0.0,
+            'n_estimators': 100,
             'num_leaves': 255,
+            'random_state': None,
+            'reg_alpha': 0.0,
+            'reg_lambda': 0.0,
+            'silent': 'warn',
+            'subsample': 1.0,
+            'subsample_for_bin': 200000,
+            'subsample_freq': 0,
+            'feature_pre_filter': False,
+            'lambda_l1': 0.4595118865450501,
+            'lambda_l2': 2.5100115306227555e-05,
             'feature_fraction': 1.0,
             'bagging_fraction': 1.0,
             'bagging_freq': 0,
-            'min_child_samples': 5
         }
-        # 0.8102238689267146
+        # 0.7752949061534969
 # %%
 # create model
 params |= CFG.model_param
@@ -109,7 +125,7 @@ model.fit(
         lgb.log_evaluation(50),
     ]
 )
-show_result(model, train_data, train_labels["target"])
+show_result(model, train_data, train_labels["target"], Path(__file__).stem)
 # %%
 # predict
 test_data = (
