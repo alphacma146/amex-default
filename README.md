@@ -14,5 +14,5 @@ Python 3.10.1
 third party library
 
 ```bash
-(virtual_env) PS C:\Users\xxxx\workspace\amexdefault> pip install path/to/requirement.txt
+(virtual_env) PS C:\Users\xxxx\workspace\amexdefault> pip install -r path/to/requirement.txt
 ```
